@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+
+{% block title %}Fichiers Admin - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-folder-fill"></i> Fichiers Admin
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="bi bi-cloud-upload"></i> Importer un fichier
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-files"></i> Fichiers stockés ({{ files.count }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if files %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th><i class="bi bi-file-earmark"></i> Nom</th>
+                                    <th><i class="bi bi-tag"></i> Type</th>
+                                    <th><i class="bi bi-card-text"></i> Description</th>
+                                    <th><i class="bi bi-hdd"></i> Taille</th>
+                                    <th><i class="bi bi-person"></i> Importé par</th>
+                                    <th><i class="bi bi-calendar"></i> Date</th>
+                                    <th class="text-center"><i class="bi bi-gear"></i> Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for file in files %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ file.name }}</strong><br>
+                                        <small class="text-muted">{{ file.get_filename }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">
+                                            {{ file.get_file_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ file.description|truncatewords:10|default:"-" }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ file.get_file_size_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">
+                                            {{ file.uploaded_by.username }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ file.uploaded_at|date:"d/m/Y H:i" }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'admin_file_download' file.pk %}" 
+                                               class="btn btn-outline-success" 
+                                               title="Télécharger">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+                                            <button type="button" 
+                                                    class="btn btn-outline-danger" 
+                                                    onclick="confirmDelete('{{ file.pk }}', '{{ file.name }}')"
+                                                    title="Supprimer">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 4rem; color: #ccc;"></i>
+                        <p class="text-muted mt-3">Aucun fichier importé</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="bi bi-cloud-upload"></i> Importer le premier fichier
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="uploadModalLabel">
+                    <i class="bi bi-cloud-upload"></i> Importer un fichier
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            <i class="bi bi-input-cursor-text"></i> Nom <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="name" 
+                               name="name" 
+                               placeholder="Ex: Modèle utilisateur" 
+                               required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="file_type" class="form-label">
+                            <i class="bi bi-tag"></i> Type <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="file_type" name="file_type" required>
+                            <option value="">-- Sélectionner un type --</option>
+                            <option value="model">Modèle de données</option>
+                            <option value="env">Fichier environnement</option>
+                            <option value="config">Configuration</option>
+                            <option value="template">Template</option>
+                            <option value="other">Autre</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">
+                            <i class="bi bi-card-text"></i> Description
+                        </label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="3" 
+                                  placeholder="Description optionnelle..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="file" class="form-label">
+                            <i class="bi bi-file-earmark-arrow-up"></i> Fichier <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" 
+                               class="form-control" 
+                               id="file" 
+                               name="file" 
+                               accept=".xls,.xlsx,.txt,.doc,.docx,.pdf,.json,.xml,.csv,.env,.py,.sql"
+                               required>
+                        <small class="text-muted">
+                            Formats acceptés: Excel, Word, Text, PDF, JSON, XML, CSV, etc.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annuler
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Importer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmer la suppression
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer le fichier <strong id="deleteFileName"></strong> ?</p>
+                <p class="text-danger">Cette action est irréversible.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annuler
+                </button>
+                <a href="#" id="confirmDeleteBtn" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Supprimer
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(fileId, fileName) {
+    document.getElementById('deleteFileName').textContent = fileName;
+    document.getElementById('confirmDeleteBtn').href = '/admin-files/' + fileId + '/delete/';
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+
+{% endblock %}

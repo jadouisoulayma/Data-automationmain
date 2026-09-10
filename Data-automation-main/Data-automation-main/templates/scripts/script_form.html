@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if script %}Modifier{% else %}Créer{% endif %} un script - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-file-code"></i> 
+                {% if script %}Modifier le script{% else %}Créer un nouveau script{% endif %}
+            </h1>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-10 offset-md-1">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nom du script *</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ script.name|default:'' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="2">{{ script.description|default:'' }}</textarea>
+                        <small class="text-muted">Décrivez ce que fait votre script</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="code" class="form-label">Code Python *</label>
+                        <textarea class="form-control code-editor" id="code" name="code" 
+                                  rows="20" required>{{ script.code|default:'' }}</textarea>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            Astuce: Utilisez <code>os.environ['INPUT_FILE']</code> pour accéder au fichier d'entrée 
+                            et créez un fichier <code>output.xlsx</code> dans le même répertoire pour le résultat
+                        </small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-code-slash"></i> Variables personnalisées par défaut - Optionnel
+                        </label>
+                        <div id="default-variables-container">
+                            {% if script.default_variables %}
+                                {% for var_name in script.default_variables %}
+                                <div class="default-variable-row mb-2">
+                                    <div class="row g-2">
+                                        <div class="col-md-10">
+                                            <input type="text" class="form-control" name="default_var_name[]" 
+                                                   placeholder="Nom de la variable (ex: API_KEY, DB_HOST)" value="{{ var_name }}">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDefaultVariable(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="default-variable-row mb-2">
+                                    <div class="row g-2">
+                                        <div class="col-md-10">
+                                            <input type="text" class="form-control" name="default_var_name[]" 
+                                                   placeholder="Nom de la variable (ex: API_KEY, DB_HOST)">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDefaultVariable(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addDefaultVariable()">
+                            <i class="bi bi-plus-circle"></i> Ajouter une variable
+                        </button>
+                        <small class="text-muted d-block mt-2">
+                            Définissez les noms des variables dont votre script a besoin. Les utilisateurs entreront les valeurs lors de l'exécution.
+                        </small>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> {% if script %}Mettre à jour{% else %}Créer{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if not script %}
+        <div class="card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-lightbulb"></i> Exemple de code
+            </div>
+            <div class="card-body">
+                <pre class="code-editor mb-0"><code>import pandas as pd
+import os
+
+# Lire le fichier d'entrée (Excel)
+input_file = os.environ.get('INPUT_FILE', 'input.xlsx')
+df = pd.read_excel(input_file)
+
+# Traiter les données
+df['Nouveau_Champ'] = df['Champ1'] + df['Champ2']
+
+# Sauvegarder le résultat
+output_file = 'output.xlsx'
+df.to_excel(output_file, index=False)
+
+print(f"Traitement terminé: {len(df)} lignes")</code></pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function addDefaultVariable() {
+    const container = document.getElementById('default-variables-container');
+    const newRow = document.createElement('div');
+    newRow.className = 'default-variable-row mb-2';
+    newRow.innerHTML = `
+        <div class="row g-2">
+            <div class="col-md-10">
+                <input type="text" class="form-control" name="default_var_name[]" 
+                       placeholder="Nom de la variable (ex: API_KEY, DB_HOST)">
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeDefaultVariable(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newRow);
+}
+
+function removeDefaultVariable(button) {
+    const row = button.closest('.default-variable-row');
+    if (document.querySelectorAll('.default-variable-row').length > 1) {
+        row.remove();
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% block title %}Pipeline #{{ wf.pk }} en cours — Data Automation{% endblock %}
+
+{% block extra_css %}
+<style>
+body { background: #f1f5f9; }
+.prog-wrap { max-width: 860px; margin: 0 auto; }
+
+/* Header */
+.prog-header {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 24px 28px;
+  display: flex; align-items: center; gap: 20px;
+  margin-bottom: 20px;
+}
+.prog-header .wf-id { font-size:.85rem; color:#64748b; }
+.prog-header h2 { margin:0; font-size:1.2rem; font-weight:700; color:#1e293b; }
+
+/* Big progress bar */
+.big-bar-wrap { margin-bottom: 20px; }
+.big-bar-label { display:flex; justify-content:space-between; margin-bottom:8px; }
+.big-bar-label .pct { font-size:1.8rem; font-weight:800; color:#1e293b; line-height:1; }
+.big-bar-label .status-txt { font-size:.9rem; color:#64748b; align-self:flex-end; }
+.big-bar {
+  height: 14px; border-radius: 8px; background: #e2e8f0;
+  overflow: hidden;
+}
+.big-bar-fill {
+  height: 100%; border-radius: 8px;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  transition: width .5s ease;
+}
+.big-bar-fill.done   { background: linear-gradient(90deg, #16a34a, #22c55e); }
+.big-bar-fill.error  { background: linear-gradient(90deg, #dc2626, #ef4444); }
+
+/* Steps tracker */
+.steps-track {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.steps-track h6 { font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin-bottom:16px; font-weight:600; }
+.steps-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:12px; }
+.step-tile {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 10px;
+  text-align: center;
+  transition: all .2s;
+}
+.step-tile.active { background: #eff6ff; border-color: #2563eb; }
+.step-tile.done   { background: #f0fdf4; border-color: #16a34a; }
+.step-tile.error  { background: #fef2f2; border-color: #dc2626; }
+.step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700;
+  background: #e2e8f0; color: #64748b;
+}
+.step-tile.active .step-dot { background: #2563eb; color: #fff; animation: pulse 1s infinite; }
+.step-tile.done   .step-dot { background: #16a34a; color: #fff; }
+.step-tile.error  .step-dot { background: #dc2626; color: #fff; }
+.step-tile-label { font-size: .68rem; color: #64748b; line-height: 1.3; }
+.step-tile.active .step-tile-label { color: #1d4ed8; font-weight: 600; }
+.step-tile.done   .step-tile-label { color: #15803d; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* Log box */
+.log-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.log-card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .85rem; font-weight: 600; color: #1e293b;
+}
+.log-box {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 11.5px;
+  padding: 16px 20px;
+  height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+/* Result card */
+.result-card {
+  background: #fff;
+  border: 1px solid;
+  border-radius: 14px;
+  padding: 24px 28px;
+}
+.result-card.success { border-color: #16a34a; background: #f0fdf4; }
+.result-card.error   { border-color: #dc2626; background: #fef2f2; }
+
+.dl-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-size: .9rem; font-weight: 600;
+  text-decoration: none;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.dl-btn-final   { background:#16a34a; color:#fff; border:none; }
+.dl-btn-final:hover   { background:#15803d; color:#fff; }
+.dl-btn-erreurs { background:#fff; color:#d97706; border:2px solid #fbbf24; }
+.dl-btn-erreurs:hover { background:#fffbeb; color:#b45309; }
+.dl-btn-dup     { background:#fff; color:#7c3aed; border:2px solid #a78bfa; }
+.dl-btn-dup:hover     { background:#f5f3ff; color:#6d28d9; }
+
+.stats-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; }
+.stat-chip {
+  border-radius: 8px;
+  padding: 5px 13px;
+  font-size: .78rem; font-weight: 600;
+}
+.stat-chip-green  { background:rgba(22,163,74,.12);  color:#15803d; }
+.stat-chip-orange { background:rgba(217,119,6,.12);  color:#b45309; }
+.stat-chip-purple { background:rgba(124,58,237,.12); color:#6d28d9; }
+
+.dl-section {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #d1fae5;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="prog-wrap">
+
+  <!-- Header -->
+  <div class="prog-header">
+    <a href="{% url 'workflow_produits' %}" style="color:#64748b;font-size:1.4rem;text-decoration:none;flex-shrink:0">
+      <i class="bi bi-arrow-left-circle"></i>
+    </a>
+    <div>
+      <div class="wf-id">Workflow #{{ wf.pk }} · {{ wf.created_at|date:"d/m/Y à H:i" }}</div>
+      <h2>Pipeline Produits High-Tech Moving</h2>
+    </div>
+    <div class="ms-auto" id="header-badge">
+      {% if wf.status == 'success' %}
+        <span class="badge bg-success px-3 py-2 fs-6"><i class="bi bi-check-circle"></i> Terminé</span>
+      {% elif wf.status == 'error' %}
+        <span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-x-circle"></i> Erreur</span>
+      {% else %}
+        <span class="badge bg-primary px-3 py-2 fs-6"><i class="bi bi-arrow-clockwise spin"></i> En cours</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Big progress bar -->
+  <div class="big-bar-wrap">
+    <div class="big-bar-label">
+      <span class="pct" id="pct-txt">{{ wf.progress }}%</span>
+      <span class="status-txt" id="msg-txt">{{ wf.progress_message|default:"En attente…" }}</span>
+    </div>
+    <div class="big-bar">
+      <div class="big-bar-fill {% if wf.status == 'success' %}done{% elif wf.status == 'error' %}error{% endif %}"
+           id="bar-fill" style="width:{{ wf.progress }}%"></div>
+    </div>
+  </div>
+
+  <!-- Steps tracker -->
+  <div class="steps-track">
+    <h6>Étapes du pipeline</h6>
+    <div class="steps-grid">
+      {% for s in steps_list %}
+      <div class="step-tile" id="step-{{ forloop.counter0 }}">
+        <div class="step-dot" id="dot-{{ forloop.counter0 }}">{{ forloop.counter }}</div>
+        <div class="step-tile-label">{{ s }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div class="log-card">
+    <div class="log-card-header">
+      <span><i class="bi bi-terminal me-2"></i>Logs en temps réel</span>
+      <button onclick="scrollLogs()" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-down"></i> Bas
+      </button>
+    </div>
+    <div class="log-box" id="log-box">{{ wf.logs|default:"En attente de démarrage…" }}</div>
+  </div>
+
+  <!-- Result / error card (hidden until done) -->
+  <div id="result-card" class="d-none">
+    <div class="result-card success" id="success-card" style="display:none">
+      <div class="d-flex align-items-start gap-3">
+        <div class="flex-grow-1">
+          <h4 class="mb-1 text-success fw-bold">
+            <i class="bi bi-check-circle-fill me-2"></i>Traitement terminé avec succès !
+          </h4>
+          <p class="mb-0 text-muted" id="result-msg"></p>
+
+          <!-- Statistiques fichiers -->
+          <div class="stats-row" id="stats-row"></div>
+
+          <!-- Boutons de téléchargement -->
+          <div class="dl-section">
+            <!-- Produits finaux -->
+            <a id="dl-btn-final" href="#" class="dl-btn dl-btn-final d-none">
+              <i class="bi bi-file-earmark-excel-fill"></i>
+              <span id="dl-label-final">Produits finaux</span>
+            </a>
+
+            <!-- Lignes avec erreurs -->
+            <a id="dl-btn-erreurs" href="#" class="dl-btn dl-btn-erreurs d-none"
+               title="Lignes rejetées lors du contrôle qualité — à corriger manuellement">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <span id="dl-label-erreurs">Lignes avec erreurs</span>
+            </a>
+
+            <!-- Produits dupliqués -->
+            <a id="dl-btn-dup" href="#" class="dl-btn dl-btn-dup d-none"
+               title="Produits déjà présents dans le backoffice — à mettre à jour sur le site">
+              <i class="bi bi-copy"></i>
+              <span id="dl-label-dup">Produits dupliqués</span>
+            </a>
+
+            <div class="ms-auto">
+              <a href="{% url 'workflow_produits' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-plus-circle"></i> Nouveau traitement
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-card error" id="error-card" style="display:none">
+      <h4 class="text-danger fw-bold mb-2"><i class="bi bi-x-circle-fill me-2"></i>Erreur lors du traitement</h4>
+      <p class="text-muted mb-3">Consultez les logs ci-dessus pour identifier le problème.</p>
+      <a href="{% url 'workflow_produits' %}" class="btn btn-primary">
+        <i class="bi bi-arrow-repeat"></i> Relancer
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const STATUS_URL = "{% url 'workflow_produits_status' wf.pk %}";
+const DL_FINAL_URL   = "{% url 'workflow_produits_download' wf.pk %}";
+const DL_ERR_URL     = "{% url 'workflow_produits_download_erreurs' wf.pk %}";
+const DL_DUP_URL     = "{% url 'workflow_produits_download_dupliques' wf.pk %}";
+const STEP_PCTS = [5, 12, 20, 28, 35, 42, 58, 68, 75, 85];
+let done = false;
+
+function scrollLogs() {
+  const b = document.getElementById('log-box');
+  b.scrollTop = b.scrollHeight;
+}
+
+function setStep(pct, status) {
+  let activeIdx = 0;
+  for (let i = 0; i < STEP_PCTS.length; i++) {
+    if (pct >= STEP_PCTS[i]) activeIdx = i;
+  }
+  for (let i = 0; i < STEP_PCTS.length; i++) {
+    const tile = document.getElementById('step-' + i);
+    const dot  = document.getElementById('dot-'  + i);
+    if (!tile) continue;
+    tile.className = 'step-tile';
+    if (status === 'error' && i === activeIdx) {
+      tile.classList.add('error');
+    } else if (i < activeIdx || (pct >= 100 && status === 'success')) {
+      tile.classList.add('done');
+      dot.innerHTML = '<i class="bi bi-check-lg"></i>';
+    } else if (i === activeIdx) {
+      tile.classList.add('active');
+    }
+  }
+}
+
+// Active les boutons de téléchargement avec le bon libellé (nombre de lignes)
+function showDownloadButtons(data) {
+  // Bouton produits finaux (toujours présent)
+  const btnFinal = document.getElementById('dl-btn-final');
+  btnFinal.href = data.output_url || DL_FINAL_URL;
+  const nb = data.nb_lignes_output || '?';
+  document.getElementById('dl-label-final').textContent = nb + ' produits finaux';
+  btnFinal.classList.remove('d-none');
+
+  // Bouton erreurs (si le fichier existe et a été renvoyé)
+  const btnErr = document.getElementById('dl-btn-erreurs');
+  if (data.output_erreurs_url) {
+    btnErr.href = data.output_erreurs_url;
+    // Essayer de lire nb_erreurs depuis les stats si disponible
+    const nbErr = data.nb_erreurs !== undefined ? data.nb_erreurs : '';
+    document.getElementById('dl-label-erreurs').textContent = (nbErr ? nbErr + ' ' : '') + 'Lignes avec erreurs';
+    btnErr.classList.remove('d-none');
+  } else {
+    // Fallback URL directe Django
+    btnErr.href = DL_ERR_URL;
+    document.getElementById('dl-label-erreurs').textContent = 'Lignes avec erreurs';
+    btnErr.classList.remove('d-none');
+  }
+
+  // Bouton dupliqués
+  const btnDup = document.getElementById('dl-btn-dup');
+  if (data.output_dupliques_url) {
+    btnDup.href = data.output_dupliques_url;
+    const nbDup = data.nb_dupliques !== undefined ? data.nb_dupliques : '';
+    document.getElementById('dl-label-dup').textContent = (nbDup ? nbDup + ' ' : '') + 'Produits dupliqués';
+    btnDup.classList.remove('d-none');
+  } else {
+    btnDup.href = DL_DUP_URL;
+    document.getElementById('dl-label-dup').textContent = 'Produits dupliqués';
+    btnDup.classList.remove('d-none');
+  }
+}
+
+function showSuccess(data) {
+  document.getElementById('bar-fill').className = 'big-bar-fill done';
+  document.getElementById('bar-fill').style.width = '100%';
+  document.getElementById('pct-txt').textContent = '100%';
+  document.getElementById('header-badge').innerHTML =
+    '<span class="badge bg-success px-3 py-2 fs-6"><i class="bi bi-check-circle"></i> Terminé</span>';
+  setStep(100, 'success');
+
+  document.getElementById('result-msg').textContent =
+    (data.nb_lignes_output || '?') + ' produits exportés dans le fichier Excel.';
+
+  // Chips de stat
+  const stats = document.getElementById('stats-row');
+  stats.innerHTML = '';
+  if (data.nb_lignes_output) {
+    stats.innerHTML +=
+      '<span class="stat-chip stat-chip-green"><i class="bi bi-box-seam me-1"></i>' + data.nb_lignes_output + ' produits traités</span>';
+  }
+
+  showDownloadButtons(data);
+
+  document.getElementById('success-card').style.display = '';
+  document.getElementById('result-card').classList.remove('d-none');
+}
+
+function poll() {
+  if (done) return;
+  fetch(STATUS_URL)
+    .then(r => r.json())
+    .then(data => {
+      const pct = data.progress || 0;
+      document.getElementById('bar-fill').style.width = pct + '%';
+      document.getElementById('pct-txt').textContent  = pct + '%';
+      document.getElementById('msg-txt').textContent  = data.message || '';
+      if (data.logs) {
+        const b = document.getElementById('log-box');
+        b.textContent = data.logs;
+        b.scrollTop   = b.scrollHeight;
+      }
+      setStep(pct, data.status);
+
+      if (data.status === 'success') {
+        done = true;
+        showSuccess(data);
+      } else if (data.status === 'error') {
+        done = true;
+        document.getElementById('bar-fill').className = 'big-bar-fill error';
+        document.getElementById('header-badge').innerHTML =
+          '<span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-x-circle"></i> Erreur</span>';
+        setStep(pct, 'error');
+        document.getElementById('error-card').style.display = '';
+        document.getElementById('result-card').classList.remove('d-none');
+      } else {
+        setTimeout(poll, 1500);
+      }
+    })
+    .catch(() => setTimeout(poll, 3000));
+}
+
+{% if wf.status == 'running' or wf.status == 'pending' %}
+poll();
+{% elif wf.status == 'success' %}
+done = true;
+setStep(100, 'success');
+showSuccess({
+  nb_lignes_output: {{ wf.nb_lignes_output|default:0 }},
+  output_url:            {% if wf.output_file %}"{% url 'workflow_produits_download' wf.pk %}"{% else %}null{% endif %},
+  output_erreurs_url:    {% if wf.output_erreurs_file %}"{% url 'workflow_produits_download_erreurs' wf.pk %}"{% else %}null{% endif %},
+  output_dupliques_url:  {% if wf.output_dupliques_file %}"{% url 'workflow_produits_download_dupliques' wf.pk %}"{% else %}null{% endif %},
+});
+{% elif wf.status == 'error' %}
+done = true;
+document.getElementById('error-card').style.display = '';
+document.getElementById('result-card').classList.remove('d-none');
+{% endif %}
+</script>
+{% endblock %}

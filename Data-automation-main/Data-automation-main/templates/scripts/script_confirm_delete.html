@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Supprimer le script - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Confirmer la suppression</h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">Êtes-vous sûr de vouloir supprimer le script suivant ?</p>
+                
+                <div class="alert alert-warning">
+                    <h5><i class="bi bi-file-code"></i> {{ script.name }}</h5>
+                    {% if script.description %}
+                    <p class="mb-0">{{ script.description }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill"></i> 
+                    <strong>Attention:</strong> Cette action est irréversible. 
+                    Toutes les exécutions associées et leurs fichiers seront également supprimés.
+                </div>
+
+                <form method="post" class="d-grid gap-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="bi bi-trash"></i> Oui, supprimer définitivement
+                    </button>
+                    <a href="{% url 'script_detail' script.pk %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Non, annuler
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

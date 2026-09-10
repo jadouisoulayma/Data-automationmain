@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}Exécuter {{ script.name }} - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-play-circle"></i> Exécuter le script</h1>
+            <a href="{% url 'script_detail' script.pk %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-file-code"></i> {{ script.name }}</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if script.description %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> {{ script.description }}
+                </div>
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="input_file" class="form-label">
+                            <i class="bi bi-file-earmark-excel"></i> Fichier d'entrée (Excel) - Optionnel
+                        </label>
+                        <input type="file" class="form-control" id="input_file" name="input_file" 
+                               accept=".xlsx,.xls">
+                        <small class="text-muted">
+                            Si votre script nécessite un fichier Excel en entrée, uploadez-le ici
+                        </small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="bi bi-code-slash"></i> Variables personnalisées - Optionnel
+                        </label>
+                        <div id="variables-container">
+                            {% if script.default_variables %}
+                                {% for var_name in script.default_variables %}
+                                <div class="variable-row mb-2">
+                                    <div class="row g-2">
+                                        <div class="col-md-5">
+                                            <input type="text" class="form-control" name="var_name[]" 
+                                                   placeholder="Nom de la variable" value="{{ var_name }}" readonly>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" name="var_value[]" 
+                                                   placeholder="Valeur de {{ var_name }}">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeVariable(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="variable-row mb-2">
+                                    <div class="row g-2">
+                                        <div class="col-md-5">
+                                            <input type="text" class="form-control" name="var_name[]" placeholder="Nom de la variable">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control" name="var_value[]" placeholder="Valeur">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeVariable(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addVariable()">
+                            <i class="bi bi-plus-circle"></i> Ajouter une variable
+                        </button>
+                        <small class="text-muted d-block mt-2">
+                            {% if script.default_variables %}
+                                Entrez les valeurs pour les variables définies dans le script.
+                            {% else %}
+                                Ces variables seront accessibles dans votre script via <code>os.environ['NOM_VARIABLE']</code>
+                            {% endif %}
+                        </small>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        <strong>Important:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Le script s'exécutera avec un timeout de 5 minutes maximum</li>
+                            <li>Assurez-vous que votre code gère correctement les erreurs et exceptions</li>
+                            <li>Utilisez <code>os.environ['INPUT_FILE']</code> pour accéder au fichier d'entrée s'il est fourni</li>
+                            <li>Le fichier de sortie doit être nommé <code>output.xlsx</code> et sera disponible après l'exécution</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-play-circle-fill"></i> Exécuter maintenant
+                        </button>
+                        <a href="{% url 'script_detail' script.pk %}" class="btn btn-outline-secondary">
+                            Annuler
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <i class="bi bi-code-square"></i> Aperçu du code
+            </div>
+            <div class="card-body">
+                <pre class="code-editor mb-0" style="max-height: 300px; overflow-y: auto;"><code>{{ script.code }}</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addVariable() {
+    const container = document.getElementById('variables-container');
+    const newRow = document.createElement('div');
+    newRow.className = 'variable-row mb-2';
+    newRow.innerHTML = `
+        <div class="row g-2">
+            <div class="col-md-5">
+                <input type="text" class="form-control" name="var_name[]" placeholder="Nom de la variable">
+            </div>
+            <div class="col-md-6">
+                <input type="text" class="form-control" name="var_value[]" placeholder="Valeur">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeVariable(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(newRow);
+}
+
+function removeVariable(button) {
+    const row = button.closest('.variable-row');
+    if (document.querySelectorAll('.variable-row').length > 1) {
+        row.remove();
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Détail Workflow #{{ wf.pk }} — DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{% url 'workflow_produits' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Retour
+      </a>
+      <h3 class="mb-0">
+        <i class="bi bi-boxes text-primary"></i> Workflow Produits
+        <small class="text-muted fs-6">#{{ wf.pk }}</small>
+      </h3>
+      {% if wf.status == 'success' %}
+        <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Terminé</span>
+      {% elif wf.status == 'error' %}
+        <span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Erreur</span>
+      {% elif wf.status == 'running' %}
+        <span class="badge bg-primary fs-6"><i class="bi bi-arrow-repeat"></i> En cours</span>
+      {% else %}
+        <span class="badge bg-secondary fs-6">En attente</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Infos -->
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header"><i class="bi bi-info-circle"></i> Informations</div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Lancé le</span>
+          <strong>{{ wf.created_at|date:"d/m/Y H:i:s" }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Terminé le</span>
+          <strong>{% if wf.finished_at %}{{ wf.finished_at|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Utilisateur</span>
+          <strong>{{ wf.user.username }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Progression</span>
+          <strong>{{ wf.progress }}%</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Produits exportés</span>
+          <strong>{% if wf.nb_lignes_output %}{{ wf.nb_lignes_output }}{% else %}—{% endif %}</strong>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Téléchargements -->
+  <div class="col-md-7">
+    <div class="card shadow-sm">
+      <div class="card-header"><i class="bi bi-download"></i> Fichiers</div>
+      <div class="card-body">
+        {% if wf.output_file %}
+        <div class="d-flex align-items-center justify-content-between p-3 bg-success bg-opacity-10 rounded mb-3">
+          <div>
+            <i class="bi bi-file-earmark-excel fs-2 text-success"></i>
+          </div>
+          <div class="flex-grow-1 px-3">
+            <div class="fw-semibold">produits_traites_{{ wf.pk }}.xlsx</div>
+            <small class="text-muted">Fichier Excel final — {{ wf.nb_lignes_output }} produits</small>
+          </div>
+          <a href="{% url 'workflow_produits_download' wf.pk %}" class="btn btn-success">
+            <i class="bi bi-download"></i> Télécharger
+          </a>
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-3">
+          <i class="bi bi-file-earmark-x fs-2 d-block mb-1"></i>
+          Aucun fichier résultat disponible.
+        </div>
+        {% endif %}
+
+        <!-- Barre de progression -->
+        <div class="mt-3">
+          <div class="progress" style="height:10px;border-radius:6px;">
+            <div class="progress-bar {% if wf.status == 'success' %}bg-success{% elif wf.status == 'error' %}bg-danger{% else %}bg-primary{% endif %}"
+                 style="width:{{ wf.progress }}%"></div>
+          </div>
+          <small class="text-muted">{{ wf.progress }}% — {{ wf.progress_message }}</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="d-flex gap-2 mt-3">
+      <a href="{% url 'workflow_produits' %}" class="btn btn-outline-primary">
+        <i class="bi bi-plus-circle"></i> Nouveau traitement
+      </a>
+      <a href="{% url 'workflow_produits_delete' wf.pk %}" class="btn btn-outline-danger">
+        <i class="bi bi-trash"></i> Supprimer
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Logs -->
+<div class="card shadow-sm mt-4">
+  <div class="card-header"><i class="bi bi-terminal"></i> Logs d'exécution</div>
+  <div class="card-body p-0">
+    <pre style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:0 0 8px 8px;
+                font-size:12px;max-height:400px;overflow-y:auto;margin:0;white-space:pre-wrap;">{{ wf.logs }}</pre>
+  </div>
+</div>
+{% endblock %}

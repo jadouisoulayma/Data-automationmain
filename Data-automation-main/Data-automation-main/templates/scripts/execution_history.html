@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}Historique des exécutions - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-clock-history"></i> Historique des exécutions</h1>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list"></i> Toutes les exécutions</h5>
+            </div>
+            <div class="card-body">
+                {% if executions %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Script</th>
+                                <th>Utilisateur</th>
+                                <th>Statut</th>
+                                <th>Fichiers</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for execution in executions %}
+                            <tr>
+                                <td>{{ execution.executed_at|date:"d/m/Y H:i:s" }}</td>
+                                <td>
+                                    <a href="{% url 'script_detail' execution.script.pk %}">
+                                        <strong>{{ execution.script.name }}</strong>
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-person"></i> {{ execution.user.username }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if execution.status == 'success' %}
+                                    <span class="badge bg-success status-badge">
+                                        <i class="bi bi-check-circle"></i> Succès
+                                    </span>
+                                    {% elif execution.status == 'error' %}
+                                    <span class="badge bg-danger status-badge">
+                                        <i class="bi bi-x-circle"></i> Erreur
+                                    </span>
+                                    {% elif execution.status == 'running' %}
+                                    <span class="badge bg-warning status-badge">
+                                        <i class="bi bi-arrow-repeat"></i> En cours
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary status-badge">
+                                        <i class="bi bi-clock"></i> En attente
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if execution.input_file %}
+                                    <i class="bi bi-file-earmark-arrow-down text-primary" title="Fichier d'entrée"></i>
+                                    {% endif %}
+                                    {% if execution.output_file %}
+                                    <i class="bi bi-file-earmark-arrow-up text-success" title="Fichier de sortie"></i>
+                                    {% endif %}
+                                    {% if not execution.input_file and not execution.output_file %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'execution_detail' execution.pk %}" 
+                                       class="btn btn-sm btn-info" title="Voir les détails">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if execution.output_file %}
+                                    <a href="{% url 'download_file' execution.pk 'output' %}" 
+                                       class="btn btn-sm btn-success" title="Télécharger le résultat">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info mt-3">
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Gestion du stockage:</strong> 
+                    <ul class="mb-0 mt-2">
+                        <li>✅ Toutes les exécutions et logs sont conservés</li>
+                        <li>💾 Seuls les 5 derniers fichiers par script sont gardés</li>
+                        <li>💾 Maximum 100 fichiers totaux dans le projet</li>
+                        <li>🗑️ Les vieux fichiers sont automatiquement supprimés pour économiser l'espace</li>
+                    </ul>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-hourglass-split" style="font-size: 3rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">Aucune exécution dans l'historique</p>
+                    <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> Retour au tableau de bord
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

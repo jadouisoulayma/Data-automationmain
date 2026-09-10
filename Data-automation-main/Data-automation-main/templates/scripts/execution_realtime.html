@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %}Exécution en temps réel - {{ execution.script.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-terminal"></i> Exécution en temps réel</h2>
+            <div>
+                <span id="status-badge" class="badge bg-primary">
+                    <i class="bi bi-hourglass-split"></i> En cours...
+                </span>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">{{ execution.script.name }}</h5>
+                <p class="text-muted">
+                    <i class="bi bi-calendar"></i> Démarré: {{ execution.executed_at|date:"d/m/Y H:i:s" }}
+                </p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <i class="bi bi-terminal-fill"></i> Console de sortie
+            </div>
+            <div class="card-body p-0">
+                <div id="terminal-output" class="terminal-output">
+                    <div class="terminal-line">
+                        <span class="text-muted">En attente du démarrage...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="completion-actions" class="mt-3" style="display: none;">
+            <a href="{% url 'execution_detail' execution.pk %}" class="btn btn-primary">
+                <i class="bi bi-eye"></i> Voir les détails complets
+            </a>
+            <a href="{% url 'script_detail' execution.script.pk %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Retour au script
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.terminal-output {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 20px;
+    min-height: 500px;
+    max-height: 600px;
+    overflow-y: auto;
+    border-radius: 0 0 0.375rem 0.375rem;
+}
+
+.terminal-line {
+    margin-bottom: 5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.terminal-stdout {
+    color: #d4d4d4;
+}
+
+.terminal-stderr {
+    color: #f48771;
+    font-weight: 500;
+}
+
+.terminal-log {
+    color: #4ec9b0;
+}
+
+.terminal-success {
+    color: #4ec9b0;
+    font-weight: bold;
+}
+
+.terminal-error {
+    color: #f48771;
+    font-weight: bold;
+}
+
+.terminal-output::-webkit-scrollbar {
+    width: 10px;
+}
+
+.terminal-output::-webkit-scrollbar-track {
+    background: #252526;
+}
+
+.terminal-output::-webkit-scrollbar-thumb {
+    background: #3e3e42;
+    border-radius: 5px;
+}
+
+.terminal-output::-webkit-scrollbar-thumb:hover {
+    background: #4e4e52;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+.cursor {
+    display: inline-block;
+    width: 8px;
+    height: 16px;
+    background-color: #d4d4d4;
+    animation: blink 1s infinite;
+    margin-left: 2px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const terminal = document.getElementById('terminal-output');
+    const statusBadge = document.getElementById('status-badge');
+    const completionActions = document.getElementById('completion-actions');
+    let autoScroll = true;
+
+    // Clear initial message
+    terminal.innerHTML = '';
+
+    // Check if user scrolls up (disable auto-scroll)
+    terminal.addEventListener('scroll', function() {
+        const isScrolledToBottom = terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < 50;
+        autoScroll = isScrolledToBottom;
+    });
+
+    // Create EventSource for Server-Sent Events
+    const eventSource = new EventSource("{% url 'execution_stream' execution.pk %}");
+
+    eventSource.addEventListener('message', function(event) {
+        const data = JSON.parse(event.data);
+        
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+
+        switch(data.type) {
+            case 'start':
+                line.innerHTML = `<span class="terminal-log">${data.message}</span>`;
+                break;
+            
+            case 'log':
+                line.innerHTML = `<span class="terminal-log">${data.message}</span>`;
+                break;
+            
+            case 'stdout':
+                line.innerHTML = `<span class="terminal-stdout">${escapeHtml(data.message)}</span>`;
+                break;
+            
+            case 'stderr':
+                line.innerHTML = `<span class="terminal-stderr">${escapeHtml(data.message)}</span>`;
+                break;
+            
+            case 'success':
+                line.innerHTML = `<span class="terminal-success">${data.message}</span>`;
+                statusBadge.className = 'badge bg-success';
+                statusBadge.innerHTML = '<i class="bi bi-check-circle"></i> Succès';
+                completionActions.style.display = 'block';
+                break;
+            
+            case 'error':
+                line.innerHTML = `<span class="terminal-error">${data.message}</span>`;
+                statusBadge.className = 'badge bg-danger';
+                statusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Erreur';
+                completionActions.style.display = 'block';
+                break;
+            
+            case 'end':
+                eventSource.close();
+                return;
+        }
+
+        terminal.appendChild(line);
+
+        // Auto-scroll to bottom if enabled
+        if (autoScroll) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    });
+
+    eventSource.addEventListener('error', function(event) {
+        console.error('EventSource error:', event);
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        line.innerHTML = '<span class="terminal-error">❌ Erreur de connexion au stream</span>';
+        terminal.appendChild(line);
+        
+        statusBadge.className = 'badge bg-danger';
+        statusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Erreur';
+        completionActions.style.display = 'block';
+        
+        eventSource.close();
+    });
+
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+});
+</script>
+{% endblock %}

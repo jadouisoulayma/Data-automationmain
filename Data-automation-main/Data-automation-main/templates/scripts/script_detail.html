@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ script.name }} - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-file-code"></i> {{ script.name }}</h1>
+            <div>
+                <a href="{% url 'script_execute' script.pk %}" class="btn btn-success">
+                    <i class="bi bi-play-circle"></i> Exécuter
+                </a>
+                <a href="{% url 'script_edit' script.pk %}" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Modifier
+                </a>
+                <a href="{% url 'script_delete' script.pk %}" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Supprimer
+                </a>
+                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Retour
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-code-square"></i> Code du script</h5>
+            </div>
+            <div class="card-body">
+                {% if script.description %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> {{ script.description }}
+                </div>
+                {% endif %}
+                <pre class="code-editor mb-0"><code>{{ script.code }}</code></pre>
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    <i class="bi bi-clock"></i> Créé le {{ script.created_at|date:"d/m/Y à H:i" }} par <strong>{{ script.user.username }}</strong> | 
+                    Dernière modification: {{ script.updated_at|date:"d/m/Y à H:i" }} par <strong>{{ script.user.username }}</strong>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Dernières exécutions</h5>
+            </div>
+            <div class="card-body">
+                {% if executions %}
+                <div class="list-group list-group-flush">
+                    {% for execution in executions %}
+                    <a href="{% url 'execution_detail' execution.pk %}" 
+                       class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between mb-1">
+                            <small>{{ execution.executed_at|date:"d/m/Y H:i" }}</small>
+                            {% if execution.status == 'success' %}
+                            <span class="badge bg-success status-badge">
+                                <i class="bi bi-check-circle"></i> Succès
+                            </span>
+                            {% elif execution.status == 'error' %}
+                            <span class="badge bg-danger status-badge">
+                                <i class="bi bi-x-circle"></i> Erreur
+                            </span>
+                            {% elif execution.status == 'running' %}
+                            <span class="badge bg-warning status-badge">
+                                <i class="bi bi-arrow-repeat"></i> En cours
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary status-badge">
+                                <i class="bi bi-clock"></i> En attente
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            {% if execution.input_file %}
+                            <small><i class="bi bi-file-earmark-arrow-down"></i> Fichier d'entrée</small>
+                            {% endif %}
+                            {% if execution.output_file %}
+                            <small><i class="bi bi-file-earmark-arrow-up"></i> Fichier de sortie</small>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-hourglass-split" style="font-size: 2rem; color: #ccc;"></i>
+                    <p class="text-muted mt-2">Aucune exécution</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

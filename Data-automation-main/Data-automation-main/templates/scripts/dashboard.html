@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Tableau de bord - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-house"></i> Tableau de bord</h1>
+            <a href="{% url 'script_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Nouveau script
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── Workflow Produits — accès rapide ───────────────────────────────── -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card shadow-sm border-0" style="background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%);color:#fff;">
+      <div class="card-body d-flex align-items-center gap-4 py-3">
+        <i class="bi bi-boxes" style="font-size:3rem;opacity:.9"></i>
+        <div class="flex-grow-1">
+          <h4 class="mb-1 fw-bold">Workflow Produits</h4>
+          <p class="mb-0 opacity-75 small">
+            Pipeline complet : nettoyage, prédiction ML catégories/marques, SEO, prix, comparaison backoffice → Excel
+          </p>
+        </div>
+        <a href="{% url 'workflow_produits' %}" class="btn btn-light btn-lg fw-semibold px-4">
+          <i class="bi bi-play-fill"></i> Lancer
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+    <!-- Scripts Section -->
+    <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-code"></i> Mes scripts</h5>
+            </div>
+            <div class="card-body">
+                {% if scripts %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Description</th>
+                                <th>Dernière modification</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for script in scripts %}
+                            <tr>
+                                <td>
+                                    <strong>{{ script.name }}</strong>
+                                </td>
+                                <td>{{ script.description|truncatewords:10 }}</td>
+                                <td>{{ script.updated_at|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'script_detail' script.pk %}" 
+                                       class="btn btn-sm btn-info" title="Voir">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'script_execute' script.pk %}" 
+                                       class="btn btn-sm btn-success" title="Exécuter">
+                                        <i class="bi bi-play-circle"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">Aucun script créé</p>
+                    <a href="{% url 'script_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Créer votre premier script
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Executions Section -->
+    <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Exécutions récentes</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_executions %}
+                <div class="list-group list-group-flush">
+                    {% for execution in recent_executions %}
+                    <a href="{% url 'execution_detail' execution.pk %}" 
+                       class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ execution.script.name }}</h6>
+                            <small>{{ execution.executed_at|date:"d/m H:i" }}</small>
+                        </div>
+                        <p class="mb-1">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ execution.user.username }}
+                            </small>
+                        </p>
+                        <p class="mb-1">
+                            {% if execution.status == 'success' %}
+                            <span class="badge bg-success status-badge">
+                                <i class="bi bi-check-circle"></i> Succès
+                            </span>
+                            {% elif execution.status == 'error' %}
+                            <span class="badge bg-danger status-badge">
+                                <i class="bi bi-x-circle"></i> Erreur
+                            </span>
+                            {% elif execution.status == 'running' %}
+                            <span class="badge bg-warning status-badge">
+                                <i class="bi bi-arrow-repeat"></i> En cours
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary status-badge">
+                                <i class="bi bi-clock"></i> En attente
+                            </span>
+                            {% endif %}
+                        </p>
+                    </a>
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{% url 'execution_history' %}" class="btn btn-sm btn-outline-secondary">
+                        Voir tout l'historique <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-hourglass-split" style="font-size: 2rem; color: #ccc;"></i>
+                    <p class="text-muted mt-2">Aucune exécution</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

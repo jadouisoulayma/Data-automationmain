@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Résultat d'exécution - DataAutomation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-terminal"></i> Résultat d'exécution</h1>
+            <div>
+                <a href="{% url 'script_detail' execution.script.pk %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Retour au script
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-9">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header 
+                {% if execution.status == 'success' %}bg-success
+                {% elif execution.status == 'error' %}bg-danger
+                {% elif execution.status == 'running' %}bg-warning
+                {% else %}bg-secondary{% endif %} text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-code"></i> {{ execution.script.name }}
+                    </h5>
+                    {% if execution.status == 'success' %}
+                    <span class="badge bg-light text-success">
+                        <i class="bi bi-check-circle"></i> Succès
+                    </span>
+                    {% elif execution.status == 'error' %}
+                    <span class="badge bg-light text-danger">
+                        <i class="bi bi-x-circle"></i> Erreur
+                    </span>
+                    {% elif execution.status == 'running' %}
+                    <span class="badge bg-light text-warning">
+                        <i class="bi bi-arrow-repeat"></i> En cours
+                    </span>
+                    {% else %}
+                    <span class="badge bg-light text-secondary">
+                        <i class="bi bi-clock"></i> En attente
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> Exécuté le {{ execution.executed_at|date:"d/m/Y à H:i:s" }} par <strong>{{ execution.user.username }}</strong>
+                    </small>
+                </div>
+
+                <h5><i class="bi bi-journal-text"></i> Logs d'exécution</h5>
+                <div class="log-output">{{ execution.logs|default:"Aucun log disponible" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        {% if execution.variables %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-code-slash"></i> Variables</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    {% for key, value in execution.variables.items %}
+                    <li class="mb-2">
+                        <small class="text-muted">{{ key }}</small>
+                        <div class="text-break"><code>{{ value }}</code></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark"></i> Fichiers</h5>
+            </div>
+            <div class="card-body">
+                {% if execution.input_file %}
+                <div class="mb-3">
+                    <h6><i class="bi bi-file-earmark-arrow-down"></i> Fichier d'entrée</h6>
+                    <a href="{% url 'download_file' execution.pk 'input' %}" 
+                       class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-download"></i> Télécharger
+                    </a>
+                    <small class="text-muted d-block mt-1">
+                        {{ execution.get_input_filename }}
+                    </small>
+                </div>
+                {% endif %}
+
+                {% if execution.output_file %}
+                <div class="mb-3">
+                    <h6><i class="bi bi-file-earmark-arrow-up"></i> Fichier de sortie</h6>
+                    <a href="{% url 'download_file' execution.pk 'output' %}" 
+                       class="btn btn-sm btn-success w-100">
+                        <i class="bi bi-download"></i> Télécharger
+                    </a>
+                    <small class="text-muted d-block mt-1">
+                        {{ execution.get_output_filename }}
+                    </small>
+                </div>
+                {% endif %}
+
+                {% if not execution.input_file and not execution.output_file %}
+                <div class="text-center py-3">
+                    <i class="bi bi-inbox" style="font-size: 2rem; color: #ccc;"></i>
+                    <p class="text-muted mt-2 mb-0">Aucun fichier</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Actions</h6>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'script_execute' execution.script.pk %}" 
+                   class="btn btn-sm btn-success w-100 mb-2">
+                    <i class="bi bi-arrow-repeat"></i> Réexécuter
+                </a>
+                <a href="{% url 'script_edit' execution.script.pk %}" 
+                   class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-pencil"></i> Modifier le script
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

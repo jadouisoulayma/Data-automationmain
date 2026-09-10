@@ -1,0 +1,1098 @@
+{% extends 'base.html' %}
+
+{% block title %}Explorateur Excel - DataAutomation{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/select/1.7.0/css/select.bootstrap5.min.css" rel="stylesheet">
+<style>
+    .file-drop-zone {
+        border: 3px dashed #0d6efd;
+        border-radius: 10px;
+        padding: 60px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        background-color: #f8f9fa;
+    }
+    
+    .file-drop-zone:hover, .file-drop-zone.drag-over {
+        background-color: #e7f1ff;
+        border-color: #0056b3;
+    }
+    
+    .file-drop-zone i {
+        font-size: 4rem;
+        color: #0d6efd;
+    }
+    
+    #excel-table-container {
+        overflow-x: auto;
+        margin-top: 20px;
+    }
+    
+    .table-toolbar {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+    
+    .editable-cell {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .editable-cell:hover {
+        background-color: #fff3cd !important;
+    }
+    
+    .cell-editing {
+        background-color: #cfe2ff !important;
+    }
+    
+    .filter-badge {
+        font-size: 0.8rem;
+        margin-right: 5px;
+    }
+    
+    .row-number {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        text-align: center;
+        color: #6c757d;
+        user-select: none;
+    }
+    
+    table.dataTable thead .sorting,
+    table.dataTable thead .sorting_asc,
+    table.dataTable thead .sorting_desc {
+        cursor: pointer;
+    }
+    
+    /* Fix dropdown z-index in modals */
+    .modal .select2-container {
+        z-index: 9999 !important;
+    }
+    
+    .modal select {
+        z-index: 1050;
+    }
+    
+    .modal-backdrop {
+        z-index: 1040;
+    }
+    
+    .modal {
+        z-index: 1055;
+    }
+    
+    .modal-dialog {
+        z-index: 1056;
+    }
+    
+    /* Bootstrap select dropdown fix */
+    .dropdown-menu {
+        z-index: 9999 !important;
+    }
+    
+    /* Row and column selection styles */
+    table.dataTable tbody tr.selected {
+        background-color: #b8daff !important;
+    }
+    
+    table.dataTable tbody tr.selected td {
+        background-color: #b8daff !important;
+    }
+    
+    table.dataTable thead th.selected-column {
+        background-color: #0d6efd !important;
+        color: white !important;
+        cursor: pointer;
+    }
+    
+    table.dataTable tbody td.selected {
+        background-color: #b8daff !important;
+    }
+    
+    table.dataTable tbody td:first-child {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-file-earmark-excel"></i> Explorateur Excel
+        </h1>
+        <p class="text-muted">
+            Importez, visualisez, modifiez et exportez vos fichiers Excel sans aucun stockage permanent
+        </p>
+    </div>
+</div>
+
+<div class="row" id="upload-section">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="file-drop-zone" id="dropZone">
+                    <i class="bi bi-cloud-upload"></i>
+                    <h4 class="mt-3">Glissez-déposez votre fichier Excel ici</h4>
+                    <p class="text-muted">ou cliquez pour parcourir</p>
+                    <p class="mb-0">
+                        <small class="text-muted">Formats supportés: .xlsx, .xls</small>
+                    </p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle"></i> 
+            <strong>Note:</strong> Aucune donnée n'est stockée sur le serveur. 
+            Tout le traitement se fait dans votre navigateur.
+        </div>
+    </div>
+</div>
+
+<div class="row" id="data-section" style="display: none;">
+    <div class="col-12">
+        <!-- Stats Cards -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Lignes</h6>
+                            <h3 class="mb-0" id="stat-rows">0</h3>
+                        </div>
+                        <i class="bi bi-list-ol" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Colonnes</h6>
+                            <h3 class="mb-0" id="stat-cols">0</h3>
+                        </div>
+                        <i class="bi bi-layout-three-columns" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Feuille active</h6>
+                            <h3 class="mb-0" id="stat-sheet">-</h3>
+                        </div>
+                        <i class="bi bi-file-earmark" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Fichier</h6>
+                            <h3 class="mb-0" id="stat-filename" style="font-size: 1rem;">-</h3>
+                        </div>
+                        <i class="bi bi-file-earmark-check" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="table-toolbar">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <div class="btn-group mb-2" role="group">
+                        <button class="btn btn-primary" onclick="exportToExcel()">
+                            <i class="bi bi-download"></i> Exporter Excel
+                        </button>
+                        <button class="btn btn-success" onclick="exportToCSV()">
+                            <i class="bi bi-filetype-csv"></i> Exporter CSV
+                        </button>
+                        <button class="btn btn-danger" onclick="resetData()">
+                            <i class="bi bi-arrow-clockwise"></i> Nouveau fichier
+                        </button>
+                    </div>
+                    <div class="btn-group mb-2 ms-2" role="group">
+                        <button class="btn btn-outline-danger" onclick="deleteSelectedRows()">
+                            <i class="bi bi-trash"></i> Supprimer lignes
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="deleteSelectedColumns()">
+                            <i class="bi bi-trash"></i> Supprimer colonnes
+                        </button>
+                    </div>
+                    <div class="btn-group mb-2 ms-2" role="group">
+                        <button class="btn btn-outline-primary" onclick="showAdvancedFilter()">
+                            <i class="bi bi-funnel"></i> Filtres avancés
+                        </button>
+                        <button class="btn btn-outline-info" onclick="showGroupDialog()">
+                            <i class="bi bi-collection"></i> Regrouper
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                            <i class="bi bi-x-circle"></i> Réinitialiser
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Active Filters Display -->
+            <div id="active-filters" class="mt-3" style="display: none;">
+                <strong>Filtres actifs:</strong>
+                <div id="filter-badges" class="d-inline-block"></div>
+            </div>
+        </div>
+
+        <!-- Sheets Tabs -->
+        <ul class="nav nav-tabs" id="sheetTabs" role="tablist">
+        </ul>
+
+        <!-- Table Container -->
+        <div id="excel-table-container">
+            <table id="excelTable" class="table table-striped table-bordered table-hover" style="width:100%">
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Filter Modal -->
+<div class="modal fade" id="advancedFilterModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-funnel"></i> Filtres avancés</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="filter-rules">
+                    <div class="filter-rule mb-3">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Colonne</label>
+                                <select class="form-select filter-column">
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Opérateur</label>
+                                <select class="form-select filter-operator">
+                                    <option value="equals">Égal à</option>
+                                    <option value="notEquals">Différent de</option>
+                                    <option value="contains">Contient</option>
+                                    <option value="notContains">Ne contient pas</option>
+                                    <option value="startsWith">Commence par</option>
+                                    <option value="endsWith">Se termine par</option>
+                                    <option value="greater">Supérieur à</option>
+                                    <option value="less">Inférieur à</option>
+                                    <option value="greaterEqual">Supérieur ou égal</option>
+                                    <option value="lessEqual">Inférieur ou égal</option>
+                                    <option value="isEmpty">Est vide</option>
+                                    <option value="isNotEmpty">N'est pas vide</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Valeur</label>
+                                <input type="text" class="form-control filter-value" placeholder="Valeur">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="button" class="btn btn-outline-danger w-100" onclick="removeFilterRule(this)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addFilterRule()">
+                    <i class="bi bi-plus-circle"></i> Ajouter une règle
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="applyAdvancedFilters()">Appliquer les filtres</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Group Dialog Modal -->
+<div class="modal fade" id="groupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-collection"></i> Regroupement de données</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Regrouper par colonne:</label>
+                    <select id="groupByColumn" class="form-select">
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Fonction d'agrégation:</label>
+                    <select id="aggregateFunction" class="form-select">
+                        <option value="count">Compter</option>
+                        <option value="sum">Somme</option>
+                        <option value="avg">Moyenne</option>
+                        <option value="min">Minimum</option>
+                        <option value="max">Maximum</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Colonne à agréger:</label>
+                    <select id="aggregateColumn" class="form-select">
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="applyGrouping()">Appliquer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/select/1.7.0/js/dataTables.select.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+
+<script>
+let workbook = null;
+let currentSheetName = null;
+let dataTable = null;
+let originalData = null;
+
+// File Upload Handling
+document.getElementById('dropZone').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    handleFile(e.target.files[0]);
+});
+
+document.getElementById('dropZone').addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+});
+
+document.getElementById('dropZone').addEventListener('dragleave', (e) => {
+    e.currentTarget.classList.remove('drag-over');
+});
+
+document.getElementById('dropZone').addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        workbook = XLSX.read(data, { type: 'array' });
+        displaySheets(file.name);
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function displaySheets(filename) {
+    const sheetTabs = document.getElementById('sheetTabs');
+    sheetTabs.innerHTML = '';
+    
+    workbook.SheetNames.forEach((sheetName, index) => {
+        const li = document.createElement('li');
+        li.className = 'nav-item';
+        li.innerHTML = `
+            <a class="nav-link ${index === 0 ? 'active' : ''}" 
+               href="#" 
+               onclick="loadSheet('${sheetName}'); return false;">
+                ${sheetName}
+            </a>
+        `;
+        sheetTabs.appendChild(li);
+    });
+    
+    document.getElementById('stat-filename').textContent = filename;
+    document.getElementById('upload-section').style.display = 'none';
+    document.getElementById('data-section').style.display = 'block';
+    
+    loadSheet(workbook.SheetNames[0]);
+}
+
+function loadSheet(sheetName) {
+    currentSheetName = sheetName;
+    const worksheet = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    if (json.length === 0) {
+        alert('La feuille est vide');
+        return;
+    }
+    
+    originalData = JSON.parse(JSON.stringify(json));
+    displayTable(json, sheetName);
+    
+    // Update active tab
+    document.querySelectorAll('#sheetTabs .nav-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.textContent.trim() === sheetName) {
+            link.classList.add('active');
+        }
+    });
+}
+
+function displayTable(data, sheetName) {
+    if (dataTable) {
+        dataTable.destroy();
+    }
+    
+    const headers = data[0];
+    const rows = data.slice(1);
+    
+    // Update stats
+    document.getElementById('stat-rows').textContent = rows.length;
+    document.getElementById('stat-cols').textContent = headers.length;
+    document.getElementById('stat-sheet').textContent = sheetName;
+    
+    // Build table
+    const table = document.getElementById('excelTable');
+    table.innerHTML = '';
+    
+    // Create header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    // Add row number header
+    const thRowNum = document.createElement('th');
+    thRowNum.textContent = '#';
+    thRowNum.className = 'row-number';
+    headerRow.appendChild(thRowNum);
+    
+    // Add column headers
+    headers.forEach((header, index) => {
+        const th = document.createElement('th');
+        th.textContent = header || `Col${index + 1}`;
+        th.setAttribute('data-col-index', index);
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Create body
+    const tbody = document.createElement('tbody');
+    rows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-row-index', rowIndex);
+        
+        // Add row number cell
+        const tdRowNum = document.createElement('td');
+        tdRowNum.textContent = rowIndex + 1;
+        tdRowNum.className = 'row-number';
+        tr.appendChild(tdRowNum);
+        
+        // Add data cells
+        headers.forEach((header, colIndex) => {
+            const td = document.createElement('td');
+            td.textContent = row[colIndex] !== undefined ? row[colIndex] : '';
+            td.className = 'editable-cell';
+            td.setAttribute('data-row', rowIndex);
+            td.setAttribute('data-col', colIndex);
+            td.setAttribute('contenteditable', 'false');
+            
+            // Double-click to edit
+            td.addEventListener('dblclick', function() {
+                this.setAttribute('contenteditable', 'true');
+                this.classList.add('cell-editing');
+                this.focus();
+            });
+            
+            // Save on blur
+            td.addEventListener('blur', function() {
+                this.setAttribute('contenteditable', 'false');
+                this.classList.remove('cell-editing');
+                const rowIdx = parseInt(this.getAttribute('data-row'));
+                const colIdx = parseInt(this.getAttribute('data-col'));
+                const worksheet = workbook.Sheets[currentSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                json[rowIdx + 1][colIdx] = this.textContent;
+                
+                // Update workbook
+                const newSheet = XLSX.utils.aoa_to_sheet(json);
+                workbook.Sheets[currentSheetName] = newSheet;
+            });
+            
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    
+    // Initialize DataTables
+    dataTable = $('#excelTable').DataTable({
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Tous"]],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: 'Blfrtip',
+        select: {
+            style: 'multi',
+            selector: 'td.row-number'
+        },
+        columnDefs: [
+            {
+                targets: 0,
+                orderable: true,
+                className: 'row-number select-checkbox'
+            },
+            {
+                targets: '_all',
+                className: 'editable-cell'
+            }
+        ],
+        order: [[1, 'asc']]
+    });
+    
+    // Enable column selection
+    $('#excelTable thead th:not(.row-number)').on('click', function() {
+        const colIndex = $(this).index();
+        const column = dataTable.column(colIndex);
+        
+        // Toggle column selection
+        if ($(this).hasClass('selected-column')) {
+            $(this).removeClass('selected-column');
+            column.nodes().to$().removeClass('selected');
+        } else {
+            $(this).addClass('selected-column');
+            column.nodes().to$().addClass('selected');
+        }
+    });
+    
+    // Populate modals
+    populateColumnSelects(headers);
+}
+
+function populateColumnSelects(headers) {
+    const selects = [
+        document.getElementById('groupByColumn'),
+        document.getElementById('aggregateColumn')
+    ];
+    
+    selects.forEach(select => {
+        if (select) {
+            select.innerHTML = '';
+            headers.forEach((header, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = header || `Col${index + 1}`;
+                select.appendChild(option);
+            });
+        }
+    });
+    
+    // Update filter column selects
+    updateFilterColumnSelects(headers);
+}
+
+function deleteSelectedRows() {
+    const selectedRows = dataTable.rows('.selected').indexes().toArray();
+    
+    if (selectedRows.length === 0) {
+        alert('Aucune ligne sélectionnée');
+        return;
+    }
+    
+    if (!confirm(`Supprimer ${selectedRows.length} ligne(s) ?`)) {
+        return;
+    }
+    
+    dataTable.rows('.selected').remove().draw();
+    updateWorkbookFromTable();
+}
+
+function deleteSelectedColumns() {
+    const selectedCols = [];
+    $('#excelTable thead th.selected-column').each(function() {
+        const colIndex = $(this).index();
+        if (colIndex > 0) { // Skip row number column
+            selectedCols.push(colIndex - 1); // Adjust for row number column
+        }
+    });
+    
+    if (selectedCols.length === 0) {
+        alert('Aucune colonne sélectionnée. Cliquez sur les en-têtes de colonnes pour les sélectionner.');
+        return;
+    }
+    
+    if (!confirm(`Supprimer ${selectedCols.length} colonne(s) ?`)) {
+        return;
+    }
+    
+    // Remove columns from workbook
+    const worksheet = workbook.Sheets[currentSheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    // Sort in descending order to remove from right to left
+    selectedCols.sort((a, b) => b - a);
+    
+    const newData = json.map(row => {
+        const newRow = [...row];
+        selectedCols.forEach(colIdx => {
+            newRow.splice(colIdx, 1);
+        });
+        return newRow;
+    });
+    
+    displayTable(newData, currentSheetName);
+    
+    // Update workbook
+    const newSheet = XLSX.utils.aoa_to_sheet(newData);
+    workbook.Sheets[currentSheetName] = newSheet;
+}
+
+function updateWorkbookFromTable() {
+    const json = [];
+    const headers = [];
+    $('#excelTable thead th').each(function() {
+        if (!$(this).hasClass('row-number')) {
+            headers.push($(this).text());
+        }
+    });
+    json.push(headers);
+    
+    $('#excelTable tbody tr').each(function() {
+        const row = [];
+        $(this).find('td:not(.row-number)').each(function() {
+            row.push($(this).text());
+        });
+        json.push(row);
+    });
+    
+    const newSheet = XLSX.utils.aoa_to_sheet(json);
+    workbook.Sheets[currentSheetName] = newSheet;
+    
+    // Update stats
+    document.getElementById('stat-rows').textContent = json.length - 1;
+    document.getElementById('stat-cols').textContent = headers.length;
+}
+
+function showAdvancedFilter() {
+    const modal = new bootstrap.Modal(document.getElementById('advancedFilterModal'));
+    modal.show();
+}
+
+function updateFilterColumnSelects(headers) {
+    $('.filter-column').each(function() {
+        const currentValue = $(this).val();
+        $(this).html('');
+        headers.forEach((header, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = header || `Col${index + 1}`;
+            $(this).append(option);
+        });
+        if (currentValue) {
+            $(this).val(currentValue);
+        }
+    });
+}
+
+function addFilterRule() {
+    const filterRules = document.getElementById('filter-rules');
+    const newRule = document.createElement('div');
+    newRule.className = 'filter-rule mb-3';
+    newRule.innerHTML = `
+        <div class="row">
+            <div class="col-md-4">
+                <label class="form-label">Colonne</label>
+                <select class="form-select filter-column">
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Opérateur</label>
+                <select class="form-select filter-operator">
+                    <option value="equals">Égal à</option>
+                    <option value="notEquals">Différent de</option>
+                    <option value="contains">Contient</option>
+                    <option value="notContains">Ne contient pas</option>
+                    <option value="startsWith">Commence par</option>
+                    <option value="endsWith">Se termine par</option>
+                    <option value="greater">Supérieur à</option>
+                    <option value="less">Inférieur à</option>
+                    <option value="greaterEqual">Supérieur ou égal</option>
+                    <option value="lessEqual">Inférieur ou égal</option>
+                    <option value="isEmpty">Est vide</option>
+                    <option value="isNotEmpty">N'est pas vide</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Valeur</label>
+                <input type="text" class="form-control filter-value" placeholder="Valeur">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">&nbsp;</label>
+                <button type="button" class="btn btn-outline-danger w-100" onclick="removeFilterRule(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    filterRules.appendChild(newRule);
+    
+    // Populate column select
+    const worksheet = workbook.Sheets[currentSheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    const headers = json[0];
+    updateFilterColumnSelects(headers);
+}
+
+function removeFilterRule(button) {
+    const rule = button.closest('.filter-rule');
+    const filterRules = document.getElementById('filter-rules');
+    if (filterRules.children.length > 1) {
+        rule.remove();
+    }
+}
+
+function applyAdvancedFilters() {
+    const rules = [];
+    document.querySelectorAll('.filter-rule').forEach(ruleDiv => {
+        const colIndex = parseInt(ruleDiv.querySelector('.filter-column').value);
+        const operator = ruleDiv.querySelector('.filter-operator').value;
+        const value = ruleDiv.querySelector('.filter-value').value;
+        
+        rules.push({ colIndex, operator, value });
+    });
+    
+    // Apply custom filter
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        return rules.every(rule => {
+            const cellValue = data[rule.colIndex + 1]; // +1 for row number column
+            const filterValue = rule.value;
+            
+            switch(rule.operator) {
+                case 'equals':
+                    return cellValue == filterValue;
+                case 'notEquals':
+                    return cellValue != filterValue;
+                case 'contains':
+                    return cellValue.toString().toLowerCase().includes(filterValue.toLowerCase());
+                case 'notContains':
+                    return !cellValue.toString().toLowerCase().includes(filterValue.toLowerCase());
+                case 'startsWith':
+                    return cellValue.toString().toLowerCase().startsWith(filterValue.toLowerCase());
+                case 'endsWith':
+                    return cellValue.toString().toLowerCase().endsWith(filterValue.toLowerCase());
+                case 'greater':
+                    return parseFloat(cellValue) > parseFloat(filterValue);
+                case 'less':
+                    return parseFloat(cellValue) < parseFloat(filterValue);
+                case 'greaterEqual':
+                    return parseFloat(cellValue) >= parseFloat(filterValue);
+                case 'lessEqual':
+                    return parseFloat(cellValue) <= parseFloat(filterValue);
+                case 'isEmpty':
+                    return !cellValue || cellValue.toString().trim() === '';
+                case 'isNotEmpty':
+                    return cellValue && cellValue.toString().trim() !== '';
+                default:
+                    return true;
+            }
+        });
+    });
+    
+    dataTable.draw();
+    
+    // Show active filters
+    const filterBadges = document.getElementById('filter-badges');
+    filterBadges.innerHTML = '';
+    rules.forEach((rule, index) => {
+        const worksheet = workbook.Sheets[currentSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const colName = json[0][rule.colIndex] || `Col${rule.colIndex + 1}`;
+        
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary filter-badge';
+        badge.innerHTML = `${colName} ${rule.operator} ${rule.value} <i class="bi bi-x-circle" style="cursor: pointer;" onclick="removeFilter(${index})"></i>`;
+        filterBadges.appendChild(badge);
+    });
+    
+    document.getElementById('active-filters').style.display = 'block';
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('advancedFilterModal'));
+    modal.hide();
+}
+
+function deleteSelected() {
+    deleteSelectedRows();
+}
+
+function clearFilters() {
+    if (dataTable) {
+        // Remove ALL custom filters
+        while ($.fn.dataTable.ext.search.length > 0) {
+            $.fn.dataTable.ext.search.pop();
+        }
+        
+        // Clear DataTable search and filters
+        dataTable.search('').columns().search('').draw();
+        
+        // Hide active filters badge
+        document.getElementById('active-filters').style.display = 'none';
+        document.getElementById('filter-badges').innerHTML = '';
+        
+        // Reset filter modal completely
+        const filterRules = document.getElementById('filter-rules');
+        filterRules.innerHTML = `
+            <div class="filter-rule mb-3">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Colonne</label>
+                        <select class="form-select filter-column">
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Opérateur</label>
+                        <select class="form-select filter-operator">
+                            <option value="equals">Égal à</option>
+                            <option value="notEquals">Différent de</option>
+                            <option value="contains">Contient</option>
+                            <option value="notContains">Ne contient pas</option>
+                            <option value="startsWith">Commence par</option>
+                            <option value="endsWith">Se termine par</option>
+                            <option value="greater">Supérieur à</option>
+                            <option value="less">Inférieur à</option>
+                            <option value="greaterEqual">Supérieur ou égal</option>
+                            <option value="lessEqual">Inférieur ou égal</option>
+                            <option value="isEmpty">Est vide</option>
+                            <option value="isNotEmpty">N'est pas vide</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Valeur</label>
+                        <input type="text" class="form-control filter-value" placeholder="Valeur">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-outline-danger w-100" onclick="removeFilterRule(this)">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Repopulate column selects if workbook exists
+        if (workbook && currentSheetName) {
+            const worksheet = workbook.Sheets[currentSheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            if (json.length > 0) {
+                const headers = json[0];
+                updateFilterColumnSelects(headers);
+            }
+        }
+    }
+}
+
+function resetData() {
+    if (confirm('Charger un nouveau fichier ? Les modifications non exportées seront perdues.')) {
+        document.getElementById('upload-section').style.display = 'block';
+        document.getElementById('data-section').style.display = 'none';
+        document.getElementById('fileInput').value = '';
+        if (dataTable) {
+            dataTable.destroy();
+            dataTable = null;
+        }
+        workbook = null;
+        currentSheetName = null;
+    }
+}
+
+function exportToExcel() {
+    if (!dataTable) {
+        alert('Aucune donnée à exporter');
+        return;
+    }
+    
+    // Get filtered data from DataTable
+    const filteredData = [];
+    
+    // Get headers (excluding row number column)
+    const headers = [];
+    dataTable.columns().every(function(index) {
+        if (index > 0) { // Skip row number column
+            const header = $(this.header()).text();
+            headers.push(header);
+        }
+    });
+    filteredData.push(headers);
+    
+    // Get visible rows data
+    dataTable.rows({ search: 'applied' }).every(function() {
+        const rowData = [];
+        const data = this.data();
+        // Skip first cell (row number)
+        for (let i = 1; i < data.length; i++) {
+            const cellText = $(data[i]).text() || data[i];
+            rowData.push(cellText);
+        }
+        filteredData.push(rowData);
+    });
+    
+    // Create new workbook with filtered data
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(filteredData);
+    XLSX.utils.book_append_sheet(wb, ws, currentSheetName || 'Sheet1');
+    
+    XLSX.writeFile(wb, 'export_filtered_' + new Date().getTime() + '.xlsx');
+}
+
+function exportToCSV() {
+    if (!dataTable) {
+        alert('Aucune donnée à exporter');
+        return;
+    }
+    
+    // Get filtered data from DataTable
+    const filteredData = [];
+    
+    // Get headers (excluding row number column)
+    const headers = [];
+    dataTable.columns().every(function(index) {
+        if (index > 0) { // Skip row number column
+            const header = $(this.header()).text();
+            headers.push(header);
+        }
+    });
+    filteredData.push(headers);
+    
+    // Get visible rows data
+    dataTable.rows({ search: 'applied' }).every(function() {
+        const rowData = [];
+        const data = this.data();
+        // Skip first cell (row number)
+        for (let i = 1; i < data.length; i++) {
+            const cellText = $(data[i]).text() || data[i];
+            rowData.push(cellText);
+        }
+        filteredData.push(rowData);
+    });
+    
+    // Convert to CSV
+    const csv = filteredData.map(row => 
+        row.map(cell => {
+            // Escape quotes and wrap in quotes if contains comma or quote
+            const cellStr = String(cell || '');
+            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                return '"' + cellStr.replace(/"/g, '""') + '"';
+            }
+            return cellStr;
+        }).join(',')
+    ).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'export_filtered_' + new Date().getTime() + '.csv';
+    link.click();
+}
+
+function showGroupDialog() {
+    const modal = new bootstrap.Modal(document.getElementById('groupModal'));
+    modal.show();
+}
+
+function applyGrouping() {
+    const groupByIdx = parseInt(document.getElementById('groupByColumn').value);
+    const aggFunc = document.getElementById('aggregateFunction').value;
+    const aggColIdx = parseInt(document.getElementById('aggregateColumn').value);
+    
+    const worksheet = workbook.Sheets[currentSheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    const headers = json[0];
+    const rows = json.slice(1);
+    
+    if (rows.length === 0) {
+        alert('Aucune donnée à regrouper');
+        return;
+    }
+    
+    // Group data
+    const grouped = {};
+    rows.forEach(row => {
+        const key = row[groupByIdx] !== undefined ? row[groupByIdx] : '(vide)';
+        if (!grouped[key]) {
+            grouped[key] = [];
+        }
+        grouped[key].push(row);
+    });
+    
+    // Aggregate
+    const groupByColName = headers[groupByIdx] || `Col${groupByIdx + 1}`;
+    const aggColName = headers[aggColIdx] || `Col${aggColIdx + 1}`;
+    const result = [[groupByColName, aggFunc.toUpperCase() + '(' + aggColName + ')']];
+    
+    Object.keys(grouped).forEach(key => {
+        const values = grouped[key].map(row => {
+            const val = row[aggColIdx];
+            return val !== undefined && val !== '' ? parseFloat(val) : 0;
+        }).filter(v => !isNaN(v));
+        
+        let aggValue;
+        
+        switch(aggFunc) {
+            case 'count':
+                aggValue = grouped[key].length;
+                break;
+            case 'sum':
+                aggValue = values.reduce((a, b) => a + b, 0);
+                break;
+            case 'avg':
+                aggValue = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+                break;
+            case 'min':
+                aggValue = values.length > 0 ? Math.min(...values) : 0;
+                break;
+            case 'max':
+                aggValue = values.length > 0 ? Math.max(...values) : 0;
+                break;
+            default:
+                aggValue = 0;
+        }
+        
+        result.push([key, aggValue.toFixed(2)]);
+    });
+    
+    displayTable(result, currentSheetName + ' (Groupé)');
+    
+    const modal = bootstrap.Modal.getInstance(document.getElementById('groupModal'));
+    modal.hide();
+}
+</script>
+{% endblock %}
