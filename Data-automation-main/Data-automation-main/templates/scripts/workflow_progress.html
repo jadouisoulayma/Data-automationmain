@@ -247,11 +247,51 @@ body { background: #f1f5f9; }
     </div>
 
     <div class="result-card error" id="error-card" style="display:none">
-      <h4 class="text-danger fw-bold mb-2"><i class="bi bi-x-circle-fill me-2"></i>Erreur lors du traitement</h4>
-      <p class="text-muted mb-3">Consultez les logs ci-dessus pour identifier le problème.</p>
-      <a href="{% url 'workflow_produits' %}" class="btn btn-primary">
-        <i class="bi bi-arrow-repeat"></i> Relancer
-      </a>
+      <!-- Titre principal -->
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <span style="font-size:2.5rem;line-height:1">❌</span>
+        <div>
+          <h4 class="text-danger fw-bold mb-1">Le traitement a rencontré un problème</h4>
+          <p class="text-muted mb-0" style="font-size:.9rem">
+            Ne vous inquiétez pas — aucune donnée n'a été perdue. Lisez le message ci-dessous pour savoir quoi faire.
+          </p>
+        </div>
+      </div>
+
+      <!-- Message d'erreur clair -->
+      <div id="error-detail-box" style="background:#fef2f2;border:1px solid #fca5a5;border-left:4px solid #dc2626;border-radius:10px;padding:16px 20px;margin-bottom:16px;display:none">
+        <div style="font-weight:700;font-size:.95rem;color:#991b1b;margin-bottom:6px" id="error-title-txt">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i><span></span>
+        </div>
+        <div style="font-size:.85rem;color:#7f1d1d;line-height:1.6" id="error-conseil-txt"></div>
+      </div>
+
+      <!-- Étape concernée -->
+      <div id="error-etape-box" style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:.82rem;color:#92400e;display:none">
+        <i class="bi bi-geo-alt-fill me-1"></i><span id="error-etape-txt"></span>
+      </div>
+
+      <!-- Logs techniques (repliables) -->
+      <details style="margin-bottom:16px">
+        <summary style="cursor:pointer;font-size:.82rem;color:#64748b;font-weight:600;padding:6px 0">
+          <i class="bi bi-code-slash me-1"></i> Détail technique (pour l'administrateur)
+        </summary>
+        <div id="error-logs-box"
+             style="background:#1e1e1e;color:#f8f8f8;font-family:monospace;font-size:11px;
+                    padding:12px 16px;border-radius:8px;margin-top:8px;max-height:200px;
+                    overflow-y:auto;white-space:pre-wrap;line-height:1.5">
+        </div>
+      </details>
+
+      <!-- Actions -->
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'workflow_produits' %}" class="btn btn-primary">
+          <i class="bi bi-arrow-repeat me-1"></i> Corriger et relancer
+        </a>
+        <a href="{% url 'workflow_produits' %}" class="btn btn-outline-secondary">
+          <i class="bi bi-house me-1"></i> Retour au tableau de bord
+        </a>
+      </div>
     </div>
   </div>
 
@@ -356,6 +396,34 @@ function showSuccess(data) {
   document.getElementById('result-card').classList.remove('d-none');
 }
 
+function showError(data) {
+  document.getElementById('bar-fill').className = 'big-bar-fill error';
+  document.getElementById('header-badge').innerHTML =
+    '<span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-x-circle"></i> Erreur</span>';
+  setStep(data.progress || 0, 'error');
+
+  // Message clair traduit
+  if (data.error_message) {
+    const box = document.getElementById('error-detail-box');
+    document.getElementById('error-title-txt').querySelector('span').textContent = data.error_message;
+    box.style.display = '';
+  }
+  // Conseil / étape concernée
+  if (data.error_etape) {
+    const etapeBox = document.getElementById('error-etape-box');
+    document.getElementById('error-etape-txt').textContent = data.error_etape;
+    etapeBox.style.display = '';
+  }
+  // Logs techniques dans le bloc repliable
+  if (data.logs) {
+    const logsBox = document.getElementById('error-logs-box');
+    if (logsBox) logsBox.textContent = data.logs;
+  }
+
+  document.getElementById('error-card').style.display = '';
+  document.getElementById('result-card').classList.remove('d-none');
+}
+
 function poll() {
   if (done) return;
   fetch(STATUS_URL)
@@ -377,12 +445,7 @@ function poll() {
         showSuccess(data);
       } else if (data.status === 'error') {
         done = true;
-        document.getElementById('bar-fill').className = 'big-bar-fill error';
-        document.getElementById('header-badge').innerHTML =
-          '<span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-x-circle"></i> Erreur</span>';
-        setStep(pct, 'error');
-        document.getElementById('error-card').style.display = '';
-        document.getElementById('result-card').classList.remove('d-none');
+        showError(data);
       } else {
         setTimeout(poll, 1500);
       }
@@ -403,6 +466,22 @@ showSuccess({
 });
 {% elif wf.status == 'error' %}
 done = true;
+setStep({{ wf.progress|default:0 }}, 'error');
+document.getElementById('bar-fill').className = 'big-bar-fill error';
+document.getElementById('header-badge').innerHTML =
+  '<span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-x-circle"></i> Erreur</span>';
+// Afficher le message d'erreur générique (les détails sont dans les logs)
+document.getElementById('error-detail-box').style.display = '';
+document.getElementById('error-title-txt').querySelector('span').textContent =
+  "Une erreur s'est produite pendant le traitement.";
+document.getElementById('error-conseil-txt').textContent =
+  "Consultez le détail technique ci-dessous ou contactez l'administrateur.";
+// Copier les logs dans le bloc repliable
+(function(){
+  const logs = document.getElementById('log-box').textContent;
+  const logsBox = document.getElementById('error-logs-box');
+  if (logsBox && logs) logsBox.textContent = logs;
+})();
 document.getElementById('error-card').style.display = '';
 document.getElementById('result-card').classList.remove('d-none');
 {% endif %}

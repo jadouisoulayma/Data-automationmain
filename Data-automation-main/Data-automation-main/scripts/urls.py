@@ -31,4 +31,5 @@ urlpatterns = [
     path('workflow-produits/<int:pk>/download/dupliques/', views.workflow_produits_download_dupliques, name='workflow_produits_download_dupliques'),
     path('workflow-produits/<int:pk>/download/non-dupliques/', views.workflow_produits_download_non_dupliques, name='workflow_produits_download_non_dupliques'),
     path('workflow-produits/<int:pk>/delete/', views.workflow_produits_delete, name='workflow_produits_delete'),
+    path('workflow-produits/<int:pk>/reporting/', views.workflow_produits_reporting, name='workflow_produits_reporting'),
 ]

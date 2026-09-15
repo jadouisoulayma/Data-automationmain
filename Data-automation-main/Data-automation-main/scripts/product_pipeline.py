@@ -183,7 +183,7 @@ def etape1bis_controle_qualite(df_clean, cb=None):
     df_err["Erreur"] = df_c.loc[mask, "Erreur"].values
     t = len(df_clean)
     stats = {"total": t, "correctes": len(df_ok), "erreurs": len(df_err),
-             "taux_conformite": round(len(df_ok) / t * 100, 2) if t else 0}
+             "taux_erreur": round(len(df_err) / t * 100, 2) if t else 0}
     logger.info("Etape1bis: %d ok, %d erreurs", len(df_ok), len(df_err))
     return df_ok.reset_index(drop=True), df_err, stats
 
@@ -434,24 +434,80 @@ def etape6_images(df_clean, cb=None):
     _p(cb, 75, "Etape 6 : Generation URLs images Bing...")
     from urllib.parse import quote
     df_clean = df_clean.copy()
-    df_clean["image_urls"] = df_clean["NOM DU PRODUIT"].apply(
-        lambda n: f"https://www.bing.com/images/search?q={quote(str(n).strip())}&form=HDRSC2"
-    )
+
+    # ── Colonnes candidates : photo réelle (après fond blanc) ──────────────
+    _COLS_PHOTO_REELLE = ["photo_reelle", "photo_reel", "image_reelle", "image_reel",
+                          "real_image", "photo_url", "image_url", "photo", "image"]
+
+    # ── Colonnes candidates : images standard Z (après photo réelle) ────────
+    _COLS_IMAGES_Z = ["images_z", "image_z", "images_standard_z", "image_standard_z",
+                      "standard_z", "images_std_z", "img_z", "photos_z", "photo_z"]
+
+    cols_lower = {c.lower().strip(): c for c in df_clean.columns}
+
+    col_reelle = None
+    for candidat in _COLS_PHOTO_REELLE:
+        if candidat in cols_lower:
+            col_reelle = cols_lower[candidat]
+            break
+
+    col_z = None
+    for candidat in _COLS_IMAGES_Z:
+        if candidat in cols_lower:
+            col_z = cols_lower[candidat]
+            break
+
+    def _val_ou_none(row, col):
+        """Retourne la valeur de la colonne ou 'None' si absente/vide."""
+        if col is None:
+            return "None"
+        val = row[col]
+        if pd.notna(val) and str(val).strip() not in ("", "nan", "None", "none"):
+            return str(val).strip()
+        return "None"
+
+    def _build_image_urls(row):
+        nom = str(row["NOM DU PRODUIT"]).strip()
+
+        # 1. Photo fond blanc — URL Bing générée automatiquement
+        url_fond_blanc = f"https://www.bing.com/images/search?q={quote(nom)}&form=HDRSC2"
+
+        # 2. Photo réelle — None si absente/vide
+        url_photo_reelle = _val_ou_none(row, col_reelle)
+
+        # 3. Images standard Z — None si absentes/vides
+        url_images_z = _val_ou_none(row, col_z)
+
+        return f"{url_fond_blanc},{url_photo_reelle},{url_images_z}"
+
+    df_clean["image_urls"] = df_clean.apply(_build_image_urls, axis=1)
     return df_clean
 
 
 # ── Etape 7 : Export Excel ────────────────────────────────────────────────
 def etape7_export(df_clean, df_err, df_dup, output_dir, cb=None, input_filename="produits"):
-    _p(cb, 85, "Etape 7 : Assemblage final + export Excel (produits_finaux.xlsx)...")
+    """
+    Export des 4 fichiers Excel dans un sous-dossier daté de media/workflow/resultats/.
+    Nommage des fichiers : YYYYMMDD_HHMMSS_<type>.xlsx
+    Rapport final      : YYYYMMDD_HHMMSS_rapport.json
+    FIFO               : conserve uniquement les 3 derniers sous-dossiers de résultats.
+    """
     import datetime
-    os.makedirs(output_dir, exist_ok=True)
+    import json
+    import shutil
 
-    # Préfixe : nom du fichier source + date + heure
-    base = os.path.splitext(os.path.basename(input_filename))[0] if input_filename else "produits"
-    ts   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    pfx  = f"{base}_{ts}"
+    _p(cb, 85, "Etape 7 : Assemblage final + export Excel...")
 
-    # Préparer le DataFrame final
+    # ── 1. Dossier resultats — output_dir est media/workflow/resultats ────
+    resultats_root = output_dir
+    os.makedirs(resultats_root, exist_ok=True)
+
+    # ── 2. Sous-dossier daté YYYY-MM-DD_HH.MM.SS ─────────────────────────
+    ts      = datetime.datetime.now().strftime("%Y-%m-%d_%H.%M.%S")
+    run_dir = os.path.join(resultats_root, ts)
+    os.makedirs(run_dir, exist_ok=True)
+
+    # ── 3. Préparer le DataFrame final ────────────────────────────────────
     df_f = df_clean.copy()
     if "EAN" in df_f.columns:
         df_f = df_f.rename(columns={"EAN": "ean"})
@@ -460,17 +516,17 @@ def etape7_export(df_clean, df_err, df_dup, output_dir, cb=None, input_filename=
              and not c.startswith("_") and c not in ("etat_brut",)]
     df_f = df_f[cols + extra]
 
-    # Chemins avec nommage date-heure
-    pf  = os.path.join(output_dir, f"{pfx}_produits_finaux.xlsx")
-    pe  = os.path.join(output_dir, f"{pfx}_lignes_avec_erreurs.xlsx")
-    pd2 = os.path.join(output_dir, f"{pfx}_produits_dupliques.xlsx")
-    pn  = os.path.join(output_dir, f"{pfx}_produits_non_dupliques.xlsx")
+    # ── 4. Chemins des 4 fichiers xlsx — nommés par date ─────────────────
+    pf  = os.path.join(run_dir, f"{ts}_produits_finaux.xlsx")
+    pe  = os.path.join(run_dir, f"{ts}_lignes_avec_erreurs.xlsx")
+    pd2 = os.path.join(run_dir, f"{ts}_produits_dupliques.xlsx")
+    pn  = os.path.join(run_dir, f"{ts}_produits_non_dupliques.xlsx")
 
-    # Export — toujours créer les 4 fichiers (fichier vide si aucune donnée)
+    # ── 5. Export — toujours créer les 4 fichiers ─────────────────────────
     df_f.to_excel(pf, index=False)
 
     df_err_out = df_err if df_err is not None and len(df_err) > 0 else pd.DataFrame(
-        columns=["NOM DU PRODUIT", "EAN", "etat", "pc", "prixVente", "quantite", "raison_erreur"]
+        columns=["NOM DU PRODUIT", "EAN", "etat", "pc", "prixVente", "quantite", "Erreur"]
     )
     df_err_out.to_excel(pe, index=False)
 
@@ -485,9 +541,48 @@ def etape7_export(df_clean, df_err, df_dup, output_dir, cb=None, input_filename=
     c2 = [c for c in COLONNES_FINALES if c in df_nd.columns]
     df_nd[c2].to_excel(pn, index=False)
 
+    # ── 6. Rapport final JSON ─────────────────────────────────────────────
+    # ts = format fichier  : YYYY-MM-DD_HH-MM-SS  (compatible Windows)
+    # ts_lisible = format lisible : YYYY-MM-DD HH:MM:SS  (pour le rapport/logs)
+    ts_lisible = ts[:10] + " " + ts[11:].replace("-", ":")
+    rapport = {
+        "date_execution": ts_lisible,
+        "fichier_source": os.path.basename(input_filename) if input_filename else "inconnu",
+        "nb_produits_traites": len(df_f),
+        "nb_lignes_erreurs":   len(df_err_out),
+        "nb_dupliques":        len(df_dup_out),
+        "nb_non_dupliques":    len(df_nd[c2]) if c2 else 0,
+        "fichiers": {
+            "produits_finaux":      os.path.basename(pf),
+            "lignes_avec_erreurs":  os.path.basename(pe),
+            "produits_dupliques":   os.path.basename(pd2),
+            "produits_non_dupliques": os.path.basename(pn),
+        },
+    }
+    rapport_path = os.path.join(run_dir, f"{ts}_rapport.json")
+    with open(rapport_path, "w", encoding="utf-8") as fj:
+        json.dump(rapport, fj, ensure_ascii=False, indent=2)
+
+    # ── 7. FIFO : garder seulement les 3 derniers sous-dossiers ──────────
+    # Trie les sous-dossiers par nom (= par date) et supprime les plus anciens
+    tous_runs = sorted(
+        [d for d in os.listdir(resultats_root)
+         if os.path.isdir(os.path.join(resultats_root, d))],
+        reverse=False   # ordre croissant : le plus ancien en premier
+    )
+    MAX_RESULTATS = 4
+    a_supprimer = tous_runs[:-MAX_RESULTATS] if len(tous_runs) > MAX_RESULTATS else []
+    for ancien in a_supprimer:
+        chemin_ancien = os.path.join(resultats_root, ancien)
+        try:
+            shutil.rmtree(chemin_ancien)
+            logger.info("FIFO: suppression ancien résultat -> %s", chemin_ancien)
+        except Exception as e:
+            logger.warning("FIFO: impossible de supprimer %s : %s", chemin_ancien, e)
+
     logger.info(
-        "Etape7: %d produits -> %s | %d erreurs | %d dupliques",
-        len(df_f), pf, len(df_err_out), len(df_dup_out)
+        "Etape7: %d produits -> %s | %d erreurs | %d dupliques | rapport -> %s",
+        len(df_f), pf, len(df_err_out), len(df_dup_out), rapport_path
     )
     return pf, pe, pd2, pn
 

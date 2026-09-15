@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% load script_filters %}
+{% block title %}Reporting — Pipeline #{{ wf.pk }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --primary:#2563eb; --success:#16a34a; --warning:#d97706;
+  --danger:#dc2626;  --purple:#7c3aed;  --cyan:#0891b2;
+  --bg-page:#f1f5f9; --bg-card:#ffffff; --border:#e2e8f0;
+  --text:#1e293b;    --muted:#64748b;
+}
+body { background:var(--bg-page); }
+
+/* ── Hero ── */
+.rp-hero {
+  background:linear-gradient(135deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%);
+  border-radius:16px; padding:28px 36px; color:#fff; margin-bottom:28px;
+}
+.rp-hero h1 { font-size:1.6rem; font-weight:700; margin:0 0 4px; }
+.rp-hero p  { opacity:.85; margin:0; font-size:.9rem; }
+
+/* ── KPI cards ── */
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:24px; }
+.kpi-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+  padding:18px 16px; text-align:center; border-top:4px solid var(--primary);
+  box-shadow:0 2px 6px rgba(0,0,0,.04);
+}
+.kpi-card.ok     { border-top-color:var(--success); }
+.kpi-card.err    { border-top-color:var(--danger); }
+.kpi-card.dup    { border-top-color:var(--purple); }
+.kpi-card.nondup { border-top-color:var(--warning); }
+.kpi-card.time   { border-top-color:var(--cyan); }
+.kpi-card.speed  { border-top-color:#0f766e; }
+.kpi-val  { font-size:1.9rem; font-weight:800; line-height:1; }
+.kpi-lbl  { font-size:.72rem; color:var(--muted); margin-top:5px; text-transform:uppercase; letter-spacing:.04em; }
+.kpi-sub  { font-size:.7rem; color:var(--muted); margin-top:3px; }
+
+/* ── Jauge annulaire (SVG) ── */
+.gauge-wrap { display:flex; justify-content:center; padding:20px 0 8px; }
+.gauge-lbl  { text-align:center; font-size:.8rem; color:var(--muted); padding-bottom:12px; }
+
+/* ── Timeline exécution ── */
+.timeline { padding:0 24px 4px; }
+.tl-row   { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #f1f5f9; font-size:.82rem; }
+.tl-row:last-child { border-bottom:none; }
+.tl-dot   { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.tl-label { flex:1; color:var(--text); }
+.tl-val   { color:var(--muted); font-weight:600; }
+
+/* ── Section cards ── */
+.sec-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+  overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:22px;
+}
+.sec-head { padding:14px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.sec-head h3 { margin:0; font-size:.95rem; font-weight:600; color:var(--text); }
+
+/* ── Barres erreur ── */
+.err-bar-row { padding:9px 22px; border-bottom:1px solid #f8fafc; display:flex; align-items:center; gap:12px; }
+.err-bar-row:last-child { border-bottom:none; }
+.err-label  { font-size:.8rem; color:var(--text); min-width:190px; flex-shrink:0; }
+.err-bar-wrap { flex:1; background:#f1f5f9; border-radius:6px; height:9px; overflow:hidden; }
+.err-bar-fill { height:100%; border-radius:6px; }
+.err-count  { font-size:.8rem; font-weight:700; min-width:36px; text-align:right; }
+
+/* ── Cat erreurs pills ── */
+.cat-grid { display:flex; flex-wrap:wrap; gap:10px; padding:16px 22px; }
+.cat-pill {
+  border-radius:10px; padding:10px 16px; flex:1; min-width:130px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  border:1px solid var(--border);
+}
+.cat-pill .cp-val  { font-size:1.6rem; font-weight:800; }
+.cat-pill .cp-lbl  { font-size:.72rem; color:var(--muted); text-align:center; }
+
+/* ── Tableau erreurs ── */
+.err-table { font-size:.79rem; }
+.err-table th { background:#f8fafc; color:var(--muted); font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; border-bottom:2px solid var(--border); }
+.err-table td { vertical-align:middle; border-color:#f1f5f9; }
+.badge-err { background:#fee2e2; color:#b91c1c; border-radius:6px; padding:2px 7px; font-size:.7rem; font-weight:600; white-space:nowrap; }
+
+/* ── Bouton retour ── */
+.btn-back {
+  display:inline-flex; align-items:center; gap:6px;
+  background:#fff; border:1px solid var(--border); border-radius:8px;
+  padding:7px 16px; font-size:.85rem; color:var(--text);
+  text-decoration:none; transition:all .15s;
+}
+.btn-back:hover { border-color:var(--primary); color:var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ──────────────────────────────────────────────────────────── -->
+<div class="rp-hero">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1><i class="bi bi-bar-chart-line-fill me-2"></i>Reporting — Pipeline #{{ wf.pk }}</h1>
+      <p>
+        Fichier source : <strong>{{ rapport.fichier_source|default:"—" }}</strong>
+        &nbsp;·&nbsp; Exécution : <strong>{{ rapport.date_execution|default:wf.created_at }}</strong>
+        {% if duree_fmt != "—" %}&nbsp;·&nbsp; Durée : <strong>{{ duree_fmt }}</strong>{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'workflow_produits' %}" class="btn-back">
+      <i class="bi bi-arrow-left"></i> Retour
+    </a>
+  </div>
+</div>
+
+<!-- ── KPI row ───────────────────────────────────────────────────────── -->
+<div class="kpi-grid">
+
+  <div class="kpi-card ok">
+    <div class="kpi-val" style="color:var(--success)">{{ nb_ok }}</div>
+    <div class="kpi-lbl">Produits traités</div>
+    <div class="kpi-sub">{{ taux_erreur }}% d'erreurs</div>
+  </div>
+
+  <div class="kpi-card err">
+    <div class="kpi-val" style="color:var(--danger)">{{ nb_err }}</div>
+    <div class="kpi-lbl">Lignes avec erreurs</div>
+    <div class="kpi-sub">{{ taux_erreur }}% du total</div>
+  </div>
+
+  <div class="kpi-card dup">
+    <div class="kpi-val" style="color:var(--purple)">{{ nb_dup }}</div>
+    <div class="kpi-lbl">Dupliqués</div>
+    <div class="kpi-sub">Déjà en ligne</div>
+  </div>
+
+  <div class="kpi-card nondup">
+    <div class="kpi-val" style="color:var(--warning)">{{ nb_non_dup }}</div>
+    <div class="kpi-lbl">Non dupliqués</div>
+    <div class="kpi-sub">Nouveaux produits</div>
+  </div>
+
+  <div class="kpi-card time">
+    <div class="kpi-val" style="color:var(--cyan)">{{ duree_fmt }}</div>
+    <div class="kpi-lbl">Durée totale</div>
+    <div class="kpi-sub">
+      {% if date_debut %}{{ date_debut|date:"H:i:s" }}{% endif %}
+      {% if date_fin %} → {{ date_fin|date:"H:i:s" }}{% endif %}
+    </div>
+  </div>
+
+  <div class="kpi-card speed">
+    <div class="kpi-val" style="color:#0f766e">{{ vitesse }}</div>
+    <div class="kpi-lbl">Produits / seconde</div>
+    <div class="kpi-sub">{{ nb_total }} lignes au total</div>
+  </div>
+
+</div>
+
+<!-- ── Ligne 1 : Conformité + Timeline ──────────────────────────────── -->
+<div class="row g-4 mb-0">
+
+  <!-- Jauge conformité -->
+  <div class="col-lg-4">
+    <div class="sec-card h-100">
+      <div class="sec-head"><h3><i class="bi bi-speedometer2 me-2" style="color:var(--primary)"></i>Taux de conformité</h3></div>
+      <div class="gauge-wrap">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <!-- Piste -->
+          <circle cx="80" cy="80" r="60" fill="none" stroke="#e2e8f0" stroke-width="16"/>
+          <!-- Arc taux d'erreur (inversé : rouge si élevé, vert si faible) -->
+          <circle cx="80" cy="80" r="60" fill="none"
+            stroke="{% if taux_erreur <= 20 %}#16a34a{% elif taux_erreur <= 50 %}#d97706{% else %}#dc2626{% endif %}"
+            stroke-width="16"
+            stroke-dasharray="{% widthratio taux_erreur 100 377 %} 377"
+            stroke-dashoffset="94"
+            stroke-linecap="round"
+            transform="rotate(-90 80 80)"/>
+          <text x="80" y="76" text-anchor="middle" font-size="26" font-weight="800"
+            fill="{% if taux_erreur <= 20 %}#16a34a{% elif taux_erreur <= 50 %}#d97706{% else %}#dc2626{% endif %}">{{ taux_erreur }}%</text>
+          <text x="80" y="96" text-anchor="middle" font-size="11" fill="#64748b">taux d'erreur</text>
+        </svg>
+      </div>
+      <div class="gauge-lbl">
+        <span style="color:var(--success)">{{ nb_ok }} OK</span> &nbsp;·&nbsp;
+        <span style="color:var(--danger)">{{ nb_err }} erreurs</span> &nbsp;·&nbsp;
+        <span style="color:var(--muted)">{{ nb_total }} total</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline exécution -->
+  <div class="col-lg-8">
+    <div class="sec-card h-100">
+      <div class="sec-head"><h3><i class="bi bi-clock-history me-2" style="color:var(--cyan)"></i>Chronologie d'exécution</h3></div>
+      <div class="timeline">
+        <div class="tl-row">
+          <div class="tl-dot" style="background:var(--primary)"></div>
+          <span class="tl-label"><i class="bi bi-play-circle me-1"></i> Démarrage du pipeline</span>
+          <span class="tl-val">{% if date_debut %}{{ date_debut|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="tl-row">
+          <div class="tl-dot" style="background:var(--warning)"></div>
+          <span class="tl-label"><i class="bi bi-funnel me-1"></i> Préparation (nettoyage, contrôle, backoffice, état)</span>
+          <span class="tl-val">~35% du temps</span>
+        </div>
+        <div class="tl-row">
+          <div class="tl-dot" style="background:var(--cyan)"></div>
+          <span class="tl-label"><i class="bi bi-shield-check me-1"></i> Contrôle EAN-13</span>
+          <span class="tl-val">~5% du temps</span>
+        </div>
+        <div class="tl-row">
+          <div class="tl-dot" style="background:#0f766e"></div>
+          <span class="tl-label"><i class="bi bi-stars me-1"></i> Enrichissement (ML, textes, prix, images)</span>
+          <span class="tl-val">~55% du temps</span>
+        </div>
+        <div class="tl-row">
+          <div class="tl-dot" style="background:var(--purple)"></div>
+          <span class="tl-label"><i class="bi bi-file-earmark-excel-fill me-1"></i> Export (4 fichiers Excel + rapport)</span>
+          <span class="tl-val">~5% du temps</span>
+        </div>
+        <div class="tl-row">
+          <div class="tl-dot" style="background:var(--success)"></div>
+          <span class="tl-label"><i class="bi bi-check-circle me-1"></i> Pipeline terminé</span>
+          <span class="tl-val">{% if date_fin %}{{ date_fin|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}</span>
+        </div>
+        {% if duree_secondes %}
+        <div class="tl-row" style="background:#f0fdf4;border-radius:8px;margin-top:4px;">
+          <div class="tl-dot" style="background:var(--success)"></div>
+          <span class="tl-label" style="font-weight:600;color:var(--success)">Durée totale</span>
+          <span class="tl-val" style="color:var(--success);font-size:.9rem">{{ duree_fmt }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Ligne 2 : Catégories d'erreurs + Types détaillés ─────────────── -->
+<div class="row g-4 mt-0 mb-0">
+
+  <!-- Catégories d'erreurs de saisie -->
+  <div class="col-lg-5">
+    <div class="sec-card">
+      <div class="sec-head">
+        <h3><i class="bi bi-exclamation-circle-fill me-2" style="color:var(--danger)"></i>Erreurs de saisie par catégorie</h3>
+        <span class="badge" style="background:#fee2e2;color:#b91c1c">{{ total_cat }} au total</span>
+      </div>
+
+      {% if cat_erreurs %}
+      <div class="cat-grid">
+        {% for label, color, count in cat_erreurs %}
+        <div class="cat-pill" style="background:{{ color }}15;border-color:{{ color }}40;">
+          <span class="cp-val" style="color:{{ color }}">{{ count }}</span>
+          <span class="cp-lbl">{{ label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-4" style="color:var(--success)">
+        <i class="bi bi-check-circle-fill" style="font-size:2rem"></i>
+        <p class="mt-2 mb-0 fw-600">Aucune erreur de saisie détectée</p>
+      </div>
+      {% endif %}
+
+      <!-- Barres types détaillés -->
+      {% if types_erreurs %}
+      <div class="sec-head" style="border-top:1px solid var(--border)">
+        <h3 style="font-size:.85rem"><i class="bi bi-list-ul me-1"></i> Détail par champ</h3>
+        <span style="font-size:.75rem;color:var(--muted)">{{ total_types_erreurs }} occurrence{{ total_types_erreurs|pluralize }}</span>
+      </div>
+      {% for cause, count in types_erreurs %}
+      <div class="err-bar-row">
+        <span class="err-label">{{ cause }}</span>
+        <div class="err-bar-wrap">
+          <div class="err-bar-fill" style="width:{% widthratio count total_types_erreurs 100 %}%;background:var(--danger);"></div>
+        </div>
+        <span class="err-count" style="color:var(--danger)">{{ count }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Fichiers générés -->
+    <div class="sec-card">
+      <div class="sec-head"><h3><i class="bi bi-folder2-open me-2 text-muted"></i>Fichiers générés</h3></div>
+      <div class="p-3">
+        {% if rapport.fichiers %}
+        <ul class="list-unstyled mb-0" style="font-size:.81rem;">
+          {% for type, nom in rapport.fichiers.items %}
+          <li class="d-flex align-items-center gap-2 py-1 border-bottom" style="border-color:#f1f5f9!important">
+            <i class="bi bi-file-earmark-excel-fill text-success"></i>
+            <span class="text-muted" style="min-width:110px">{{ type }}</span>
+            <code style="font-size:.72rem;word-break:break-all">{{ nom }}</code>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted small mb-0">Informations non disponibles.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau lignes avec erreurs -->
+  <div class="col-lg-7">
+    <div class="sec-card">
+      <div class="sec-head">
+        <h3><i class="bi bi-table me-2" style="color:var(--danger)"></i>Lignes avec erreurs de saisie</h3>
+        <span style="font-size:.78rem;color:var(--muted)">{{ nb_err }} ligne{{ nb_err|pluralize }}</span>
+      </div>
+
+      {% if erreurs_rows %}
+      <!-- Filtre live -->
+      <div style="padding:10px 22px;border-bottom:1px solid #f1f5f9;">
+        <input type="text" id="errSearch" placeholder="🔍 Filtrer par nom, EAN, type d'erreur…"
+          style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:6px 12px;font-size:.8rem;outline:none;background:#f8fafc;">
+      </div>
+      <div class="table-responsive" style="max-height:460px;overflow-y:auto;">
+        <table class="table err-table mb-0 align-middle" id="errTable">
+          <thead style="position:sticky;top:0;z-index:1;">
+            <tr>
+              <th class="ps-3 py-2">#</th>
+              <th class="py-2">Produit</th>
+              <th class="py-2">EAN</th>
+              <th class="py-2">État</th>
+              <th class="py-2">Qté</th>
+              <th class="py-2">Prix</th>
+              <th class="py-2 pe-3">Erreur(s) détectée(s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in erreurs_rows %}
+            <tr>
+              <td class="ps-3 text-muted" style="font-size:.72rem">{{ forloop.counter }}</td>
+              <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ row.NOM_DU_PRODUIT|default:'' }}">
+                {{ row.NOM_DU_PRODUIT|default:"—"|truncatechars:28 }}
+              </td>
+              <td><code style="font-size:.7rem">{{ row.EAN|default:"—" }}</code></td>
+              <td>{{ row.etat|default:"—" }}</td>
+              <td>
+                {% if row.quantite == None %}<span style="color:var(--danger);font-weight:600">—</span>
+                {% else %}{{ row.quantite }}{% endif %}
+              </td>
+              <td>
+                {% if row.prixVente == None %}<span style="color:var(--danger);font-weight:600">—</span>
+                {% else %}{{ row.prixVente }}{% endif %}
+              </td>
+              <td class="pe-3">
+                {% if row.Erreur %}
+                  {% for cause in row.Erreur|split:" ; " %}
+                    <span class="badge-err d-inline-block me-1 mb-1">{{ cause }}</span>
+                  {% endfor %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5" style="color:var(--success)">
+        <i class="bi bi-check-circle-fill" style="font-size:2.5rem;display:block;margin-bottom:10px"></i>
+        <p class="fw-600 mb-1">Aucune erreur de saisie</p>
+        <p class="text-muted small">Toutes les lignes ont passé le contrôle qualité.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Téléchargements ───────────────────────────────────────────────── -->
+<div class="sec-card">
+  <div class="sec-head"><h3><i class="bi bi-download me-2 text-muted"></i>Télécharger les fichiers</h3></div>
+  <div class="p-3 d-flex flex-wrap gap-2">
+    {% if wf.output_file %}
+    <a href="{% url 'workflow_produits_download' wf.pk %}" class="btn btn-success btn-sm">
+      <i class="bi bi-file-earmark-excel-fill me-1"></i> Produits finaux
+    </a>
+    {% endif %}
+    {% if wf.output_erreurs_file %}
+    <a href="{% url 'workflow_produits_download_erreurs' wf.pk %}" class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-exclamation-triangle-fill me-1"></i> Lignes avec erreurs
+    </a>
+    {% endif %}
+    {% if wf.output_dupliques_file %}
+    <a href="{% url 'workflow_produits_download_dupliques' wf.pk %}" class="btn btn-outline-secondary btn-sm" style="color:#7c3aed;border-color:#a78bfa;">
+      <i class="bi bi-copy me-1"></i> Dupliqués
+    </a>
+    {% endif %}
+    {% if wf.output_non_dupliques_file %}
+    <a href="{% url 'workflow_produits_download_non_dupliques' wf.pk %}" class="btn btn-outline-warning btn-sm">
+      <i class="bi bi-file-earmark-check me-1"></i> Non dupliqués
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Filtre live tableau erreurs
+const searchInput = document.getElementById('errSearch');
+if (searchInput) {
+  searchInput.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#errTable tbody tr').forEach(tr => {
+      tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+}
+</script>
+{% endblock %}

@@ -101,14 +101,14 @@ class ProductWorkflow(models.Model):
     training_file = models.FileField(upload_to='workflow/training/', blank=True, null=True,
                                      verbose_name="Dataset d'entraînement (.csv)")
 
-    # Fichier résultat
-    output_file = models.FileField(upload_to='workflow/outputs/', blank=True, null=True,
+    # Fichier résultat (stockés dans workflow/resultats/ uniquement)
+    output_file = models.FileField(upload_to='workflow/resultats/', blank=True, null=True,
                                    verbose_name='Fichier Excel résultat (produits finaux)')
-    output_erreurs_file = models.FileField(upload_to='workflow/outputs/', blank=True, null=True,
+    output_erreurs_file = models.FileField(upload_to='workflow/resultats/', blank=True, null=True,
                                            verbose_name='Fichier Excel lignes avec erreurs')
-    output_dupliques_file = models.FileField(upload_to='workflow/outputs/', blank=True, null=True,
+    output_dupliques_file = models.FileField(upload_to='workflow/resultats/', blank=True, null=True,
                                              verbose_name='Fichier Excel produits dupliqués')
-    output_non_dupliques_file = models.FileField(upload_to='workflow/outputs/', blank=True, null=True,
+    output_non_dupliques_file = models.FileField(upload_to='workflow/resultats/', blank=True, null=True,
                                                  verbose_name='Fichier Excel produits non dupliqués')
 
     logs = models.TextField(blank=True)
